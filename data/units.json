@@ -1,0 +1,43 @@
+[
+    {
+        "id": "gr",
+        "symbol": "g",
+        "si_conversion_factor": 0.001
+    },
+    {
+        "id": "kg",
+        "symbol": "kg",
+        "si_conversion_factor": 1
+    },
+    {
+        "id": "ml",
+        "symbol": "ml",
+        "si_conversion_factor": 1e-6
+    },
+    {
+        "id": "l",
+        "symbol": "l",
+        "si_conversion_factor": 1e-3
+    },
+    {
+        "id": "dl",
+        "symbol": "dl",
+        "si_conversion_factor": 1e-4
+    },
+    {
+        "id": "tsp",
+        "symbol": "TL",
+        "si_conversion_factor": 5e-6
+    },
+    {
+        "id": "tbsp",
+        "symbol": "EL",
+        "si_conversion_factor": 1.5e-5
+    },
+    {
+        "id": "",
+        "symbol": "",
+        "si_conversion_factor": 1
+    }
+]
+

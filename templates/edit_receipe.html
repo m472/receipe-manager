@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block heading %}{{ receipe.title }}{% endblock %}
+
+{% block content %}
+{% for img_id in image_ids %}
+<img src="{{ url_for('get_image', receipe_id=receipe.id, image_id=img_id) }}" width="500"/>
+{% endfor %}
+
+<p><b>Zutaten:</b></p>
+{% for ingredient_group in receipe.ingredients %}
+<p><b>{{ ingredient_group.name }}</b></p>
+<ul>
+<ul>
+{% for ingredient in ingredient_group.ingredients %}
+<li>{{ ingredient.amount }}{{ units[ingredient.unit].symbol }} {{ ingredient.name }} <a href="{{ url_for('display_receipe', id=receipe.id)}}">-</a></li>
+{% endfor %}
+</ul>
+{% endfor %}
+
+<a href="{{ url_for('display_receipe', id=receipe.id) }}">Cancel</a>
+<a href="{{ url_for('update_receipe', id=receipe.id) }}">Save</a>
+
+{% endblock %}

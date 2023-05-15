@@ -1,0 +1,17 @@
+{
+    "id": 0,
+    "title": "Naan",
+    "ingredients": [
+        { "name": "", 
+            "ingredients": 
+            [
+                { "amount": 270, "unit": "gr", "name": "Weissmehl" },
+                { "amount": 30, "unit": "gr", "name": "Gluten" },
+                { "amount": 135, "unit": "ml", "name": "Wasser" },
+                { "amount": 60, "unit": "gr", "name": "Joghurt" },
+                { "amount": 0.5, "unit": "tsp", "name": "Salz" },
+                { "amount": 20, "unit": "gr", "name": "Hefe" }
+            ]
+        }
+    ]
+}

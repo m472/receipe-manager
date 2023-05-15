@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block heading %}Receipe Manager{% endblock %}
+
+{% block content %}
+<h1>Welcome to Receipe Manager!</h1>
+
+<table>
+{% for receipe in cookbook.receipes.values() %}
+    <tr>
+        <td>
+            <a href="{{url_for('display_receipe', id=receipe.id)}}">{{ receipe.title }}</a>
+        </td>
+    </tr>
+{% endfor %}
+</table>
+
+{% endblock %}
