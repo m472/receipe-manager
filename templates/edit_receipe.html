@@ -7,18 +7,34 @@
 <img src="{{ url_for('get_image', receipe_id=receipe.id, image_id=img_id) }}" width="500"/>
 {% endfor %}
 
-<p><b>Zutaten:</b></p>
+<p><b>Zutaten für <input type=number name="receipe_servings_amount" id="receipe_servings_amount" value="{{ receipe.servings.amount }}">
+    <input type="text" name="servings_unit" id="servings_unit" value="{{ receipe.servings.unit }}">:</b></p>
 {% for ingredient_group in receipe.ingredients %}
-<p><b>{{ ingredient_group.name }}</b></p>
-<ul>
-<ul>
+<p><b>Zutatengruppe <input type="text"
+    name="ingredient_group_{{ loop.index }}"
+    id="ingredient_group_{{ loop.index }}"
+    value="{{ ingredient_group.name }}"></b> <a href="javascript:add_ingredient_group()">entfernen</a></p>
+<ul id="ingredient_list_{{ loop.index }}">
 {% for ingredient in ingredient_group.ingredients %}
-<li>{{ ingredient.amount }}{{ units[ingredient.unit].symbol }} {{ ingredient.name }} <a href="{{ url_for('display_receipe', id=receipe.id)}}">-</a></li>
+<li id="ingredient_{{ loop.index }}"><input type="number" name="amount_{{ loop.index }}" id="amount" value="{{ ingredient.amount }}">
+    <input type="text" name="unit_{{ loop.index }}" value="{{ units[ingredient.unit].symbol }}">
+    <input type="text" name="ingredient_name_{{ loop.index }}" value="{{ ingredient.name }}">
+    <a href="javascript:remove_ingredient('ingredient_{{ loop.index }}')">entfernen</a></li>
 {% endfor %}
 </ul>
+<br>
+<a href="javascript:add_ingredient('ingredient_list_{{ loop.index }}')">Zutat hinzufügen</a>
 {% endfor %}
+<a href="">Zutatengruppe hinzufügen</a>
 
-<a href="{{ url_for('display_receipe', id=receipe.id) }}">Cancel</a>
-<a href="{{ url_for('update_receipe', id=receipe.id) }}">Save</a>
+<p>
+<a href="{{ url_for('display_receipe', id=receipe.id) }}">Abbrechen</a>
+<a href="{{ url_for('update_receipe', id=receipe.id) }}">Speichern</a>
+</p>
 
+{% endblock %}
+
+
+{% block script %}
+<script src="{{ url_for('static', filename='edit_receipe.js')}}"></script>
 {% endblock %}

@@ -7,7 +7,7 @@
 <img src="{{ url_for('get_image', receipe_id=receipe.id, image_id=img_id) }}" width="500"/>
 {% endfor %}
 
-<p><b>Zutaten:</b></p>
+<p><b>Zutaten für {{ receipe.servings.amount }} {{ receipe.servings.unit }}:</b></p>
 
 {% for ingredient_group in receipe.ingredients %}
 <p><b>{{ ingredient_group.name }}</b></p>

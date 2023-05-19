@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from copy import deepcopy
-from typing import TypeVar, Type
+from typing import TypeVar, Type, cast
 
 from flask import Flask, redirect, render_template, request, send_from_directory
 from werkzeug.wrappers.response import Response
@@ -43,16 +43,33 @@ class IngredientGroup:
 
 
 @dataclass
+class Servings:
+    amount: int
+    unit: str = "Portionen"
+
+
+@dataclass
 class Receipe:
     id: int
     title: str
     ingredients: list[IngredientGroup]
+    servings: Servings | None = None
 
     def get_image_ids(self) -> list[int]:
         return [
             int(f.name.split("_")[1].split(".")[0])
             for f in RECEIPE_IMG_DIR.glob(f"{self.id}_*.jpg")
         ]
+
+    def multiply_by(self, factor: int | float) -> Receipe:
+        res = deepcopy(self)
+
+        for ig in res.ingredients:
+            for i in ig.ingredients:
+                if isinstance(i.amount, (int, float)):
+                    i.amount *= factor
+
+        return res
 
     @classmethod
     def load(cls: Type[_T], path: Path) -> _T:
@@ -66,8 +83,14 @@ class Cookbook:
 
     @staticmethod
     def load() -> Cookbook:
-        receipes = [Receipe.load(f) for f in RECEIPE_DIR.iterdir() if f.is_file()]
-        units = [from_dict(Unit, f) for f in json.loads(UNITS_FILE.read_text())]
+        receipes = [
+            Receipe.load(f)
+            for f in RECEIPE_DIR.iterdir()
+            if f.is_file() and f.name.endswith(".json")
+        ]
+        units = [
+            cast(Unit, from_dict(Unit, f)) for f in json.loads(UNITS_FILE.read_text())
+        ]
         return Cookbook(
             receipes={r.id: r for r in receipes}, units={u.id: u for u in units}
         )
@@ -103,16 +126,9 @@ def display_receipe() -> str:
     else:
         factor = 1
 
-    for ig in receipe.ingredients:
-        for i in ig.ingredients:
-            if isinstance(i.amount, (int, float)):
-                i.amount *= factor
-
-    print(f"{receipe.get_image_ids() = }")
-
     return render_template(
         "receipe.html",
-        receipe=receipe,
+        receipe=receipe.multiply_by(factor),
         image_ids=receipe.get_image_ids(),
         units=COOKBOOK.units,
     )
