@@ -4,7 +4,7 @@ module Main exposing (..)
 import Browser
 import Html exposing (Html, button, div, text, p, h1, br, li, ul, b, img, main_, a, input, select, option)
 import Html.Attributes exposing (src, width, height, href, value, type_, name)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onInput)
 import Dict exposing (Dict)
 import Http
 import Json.Decode exposing (Decoder, map2, map3, map4, map5, map6, field, int, string, list, float, nullable, dict)
@@ -62,7 +62,6 @@ type alias Ingredient =
     }
 
 -- UPDATE
-
 
 type Msg
   = GotReceipe (Result Http.Error Receipe)
@@ -136,11 +135,9 @@ update msg model =
 
 
 -- SUBSCRIPTIONS
-
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.none
-
 
 -- VIEW
 
