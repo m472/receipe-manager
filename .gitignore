@@ -112,4 +112,5 @@ static/
 *~
 *.swo
 
-
+# elm stuff
+**/elm-stuff/

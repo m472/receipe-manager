@@ -1,11 +1,18 @@
 from __future__ import annotations
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from copy import deepcopy
 from typing import TypeVar, Type, cast
 
-from flask import Flask, redirect, render_template, request, send_from_directory
+from flask import (
+    Flask,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+)
 from werkzeug.wrappers.response import Response
 from serde.json import from_json
 from serde import from_dict
@@ -54,6 +61,7 @@ class Receipe:
     title: str
     ingredients: list[IngredientGroup]
     servings: Servings | None = None
+    image_ids: list[int] | None = None
 
     def get_image_ids(self) -> list[int]:
         return [
@@ -132,6 +140,26 @@ def display_receipe() -> str:
         image_ids=receipe.get_image_ids(),
         units=COOKBOOK.units,
     )
+
+
+@app.route("/receipe/json")
+def json_receipe() -> Response:
+    _id = int(request.args["id"])
+    receipe = deepcopy(COOKBOOK.receipes[_id])
+
+    if "factor" in request.args:
+        for t in [int, float]:
+            factor = try_parse(t, request.args["factor"])
+            if factor is not None:
+                break
+        else:
+            factor = 1
+    else:
+        factor = 1
+
+    receipe.image_ids = receipe.get_image_ids()
+
+    return jsonify(asdict(receipe.multiply_by(factor)) | {"units": COOKBOOK.units})
 
 
 @app.route("/receipe/image")
