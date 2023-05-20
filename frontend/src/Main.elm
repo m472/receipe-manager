@@ -2,11 +2,44 @@ module Main exposing (..)
 
 import Browser
 import Dict exposing (Dict)
-import Html exposing (Html, a, b, br, button, div, h1, img, input, li, main_, option, p, select, text, ul)
+import Html
+    exposing
+        ( Html
+        , a
+        , b
+        , br
+        , button
+        , div
+        , h1
+        , img
+        , input
+        , li
+        , main_
+        , option
+        , p
+        , select
+        , text
+        , ul
+        )
 import Html.Attributes exposing (height, href, name, src, type_, value, width)
 import Html.Events exposing (onClick, onInput)
 import Http
-import Json.Decode exposing (Decoder, dict, field, float, int, list, map2, map3, map4, map5, map6, nullable, string)
+import Json.Decode
+    exposing
+        ( Decoder
+        , dict
+        , field
+        , float
+        , int
+        , list
+        , map2
+        , map3
+        , map4
+        , map5
+        , map6
+        , nullable
+        , string
+        )
 
 
 
@@ -100,10 +133,16 @@ update msg model =
             ( Edit receipe, Cmd.none )
 
         AddIngredientGroup receipe ->
-            ( Edit { receipe | ingredients = receipe.ingredients ++ [ IngredientGroup "" [] ] }, Cmd.none )
+            ( Edit { receipe | ingredients = receipe.ingredients ++ [ IngredientGroup "" [] ] }
+            , Cmd.none
+            )
 
         RemoveIngredientGroup receipe ingredientGroupToRemove ->
-            ( Edit { receipe | ingredients = List.filter (\group -> group /= ingredientGroupToRemove) receipe.ingredients }
+            ( Edit
+                { receipe
+                    | ingredients =
+                        List.filter (\group -> group /= ingredientGroupToRemove) receipe.ingredients
+                }
             , Cmd.none
             )
 
@@ -111,7 +150,10 @@ update msg model =
             let
                 addToGroup group =
                     if group == ingredientGroup then
-                        { group | ingredients = group.ingredients ++ [ Ingredient Nothing "" "" Nothing ] }
+                        { group
+                            | ingredients =
+                                group.ingredients ++ [ Ingredient Nothing "" "" Nothing ]
+                        }
 
                     else
                         group
@@ -126,7 +168,12 @@ update msg model =
                     List.map
                         (\ig ->
                             if ig == ingredientGroup then
-                                { ingredientGroup | ingredients = List.filter (\ingredient -> ingredient /= ingredientToRemove) ingredientGroup.ingredients }
+                                { ingredientGroup
+                                    | ingredients =
+                                        List.filter
+                                            (\ingredient -> ingredient /= ingredientToRemove)
+                                            ingredientGroup.ingredients
+                                }
 
                             else
                                 ig
@@ -179,7 +226,17 @@ viewReceipe model =
             div []
                 [ h1 [] [ text receipe.title ]
                 , viewImages receipe.id receipe.image_ids
-                , p [] [ b [] [ text ("Zutaten für " ++ String.fromInt receipe.servings.amount ++ " " ++ receipe.servings.unit ++ ":") ] ]
+                , p []
+                    [ b []
+                        [ text
+                            ("Zutaten für "
+                                ++ String.fromInt receipe.servings.amount
+                                ++ " "
+                                ++ receipe.servings.unit
+                                ++ ":"
+                            )
+                        ]
+                    ]
                 , div [] (List.map (viewIngredientGroup receipe.units) receipe.ingredients)
                 , button [ onClick (EditReceipe receipe) ] [ text "edit" ]
                 ]
@@ -191,14 +248,20 @@ viewReceipe model =
                 , p []
                     [ b []
                         [ text "Zutaten für "
-                        , input [ type_ "number", value (String.fromInt receipe.servings.amount) ] []
+                        , input
+                            [ type_ "number"
+                            , value
+                                (String.fromInt receipe.servings.amount)
+                            ]
+                            []
                         , text " "
                         , input [ value receipe.servings.unit ] []
                         , text ":"
                         ]
                     ]
                 , div [] (List.map (editIngredientGroup receipe) receipe.ingredients)
-                , button [ onClick (AddIngredientGroup receipe) ] [ text "Zutatengruppe hinzufügen" ]
+                , button [ onClick (AddIngredientGroup receipe) ]
+                    [ text "Zutatengruppe hinzufügen" ]
                 , button [ onClick (Save receipe) ] [ text "Speichern" ]
                 , button [ onClick CancelEdit ] [ text "Abbrechen" ]
                 ]
@@ -207,7 +270,21 @@ viewReceipe model =
 viewImages : Int -> List Int -> Html Msg
 viewImages receipe_id image_ids =
     div []
-        (List.map (\img_id -> img [ src ("/receipe/image?receipe_id=" ++ String.fromInt receipe_id ++ "&image_id=" ++ String.fromInt img_id), width 500 ] []) image_ids)
+        (List.map
+            (\img_id ->
+                img
+                    [ src
+                        ("/receipe/image?receipe_id="
+                            ++ String.fromInt receipe_id
+                            ++ "&image_id="
+                            ++ String.fromInt img_id
+                        )
+                    , width 500
+                    ]
+                    []
+            )
+            image_ids
+        )
 
 
 viewIngredientGroup : Dict String Unit -> IngredientGroup -> Html Msg
