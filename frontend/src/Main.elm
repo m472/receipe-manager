@@ -431,33 +431,32 @@ viewUnit ingredient_unit_id units =
 editIngredient : Dict String Unit -> Int -> IngredientGroup -> Int -> Ingredient -> Html Msg
 editIngredient units i ingredientGroup j ingredient =
     li []
-        [ Html.map (\msg -> RoutedReceipeMsg (RoutedIngredientGroupMsg i (RoutedIngredientMsg i j msg)))
-            (div []
-                [ input
-                    [ type_ "number"
-                    , value (viewMaybeFloat ingredient.amount)
-                    , onInput UpdateAmount
-                    ]
-                    []
-                , editUnit ingredient.unit units
-                , text " "
-                , input
-                    [ type_ "text"
-                    , value ingredient.name
-                    , onInput UpdateName
-                    ]
-                    []
-                , input
-                    [ type_ "text"
-                    , value (Maybe.withDefault "" ingredient.comment)
-                    , onInput UpdateComment
-                    ]
-                    []
+        (List.map (Html.map (\msg -> RoutedReceipeMsg (RoutedIngredientGroupMsg i (RoutedIngredientMsg i j msg))))
+            [ input
+                [ type_ "number"
+                , value (viewMaybeFloat ingredient.amount)
+                , onInput UpdateAmount
                 ]
-            )
-        , Html.map (\msg -> RoutedReceipeMsg (RoutedIngredientGroupMsg i msg))
-            (button [ onClick (RemoveIngredient j) ] [ text "-" ])
-        ]
+                []
+            , editUnit ingredient.unit units
+            , text " "
+            , input
+                [ type_ "text"
+                , value ingredient.name
+                , onInput UpdateName
+                ]
+                []
+            , input
+                [ type_ "text"
+                , value (Maybe.withDefault "" ingredient.comment)
+                , onInput UpdateComment
+                ]
+                []
+            ]
+            ++ [ Html.map (\msg -> RoutedReceipeMsg (RoutedIngredientGroupMsg i msg))
+                    (button [ onClick (RemoveIngredient j) ] [ text "-" ])
+               ]
+        )
 
 
 editUnit : String -> Dict.Dict String Unit -> Html IngredientMsg
