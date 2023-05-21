@@ -98,8 +98,6 @@ type Msg
     | EditReceipe
     | Save
     | CancelEdit
-    | RoutedIngredientMsg Int Int IngredientMsg
-    | RoutedIngredientGroupMsg Int IngredientGroupMsg
     | RoutedReceipeMsg ReceipeMsg
 
 
@@ -109,6 +107,7 @@ type ReceipeMsg
     | UpdateTitle String
     | UpdateServingsAmount String
     | UpdateServingsUnit String
+    | RoutedIngredientGroupMsg Int IngredientGroupMsg
 
 
 type IngredientMsg
@@ -122,6 +121,7 @@ type IngredientGroupMsg
     = UpdateGroupName String
     | AddIngredient
     | RemoveIngredient Int
+    | RoutedIngredientMsg Int Int IngredientMsg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -143,38 +143,9 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        {- }
-           AddIngredientGroup ->
-               case model of
-                   ViewReceipe receipe _ ->
-                       ( ViewReceipe
-                           { receipe
-                               | ingredients =
-                                   receipe.ingredients
-                                       ++ [ IngredientGroup "" [] ]
-                           }
-                           Edit
-                       , Cmd.none
-                       )
-
-                   _ ->
-                       ( model, Cmd.none )
-
-           RemoveIngredientGroup index ->
-               case model of
-                   ViewReceipe receipe _ ->
-                       ( ViewReceipe
-                           { receipe | ingredients = removeElementAt index receipe.ingredients }
-                           Edit
-                       , Cmd.none
-                       )
-
-                   _ ->
-                       ( model, Cmd.none )
-        -}
         Save ->
             case model of
-                ViewReceipe receipe _ ->
+                ViewReceipe receipe Edit ->
                     ( ViewReceipe receipe Display, Cmd.none )
 
                 _ ->
@@ -184,61 +155,6 @@ update msg model =
             ( Loading
             , getReceipe
             )
-
-        RoutedIngredientMsg groupIndex index childMsg ->
-            case model of
-                ViewReceipe receipe _ ->
-                    let
-                        groups =
-                            List.indexedMap
-                                (\i ig ->
-                                    if i == groupIndex then
-                                        { ig
-                                            | ingredients =
-                                                List.indexedMap
-                                                    (\j ing ->
-                                                        if j == index then
-                                                            updateIngredient childMsg ing
-
-                                                        else
-                                                            ing
-                                                    )
-                                                    ig.ingredients
-                                        }
-
-                                    else
-                                        ig
-                                )
-                                receipe.ingredients
-                    in
-                    ( ViewReceipe { receipe | ingredients = groups } Edit
-                    , Cmd.none
-                    )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        RoutedIngredientGroupMsg groupIndex childMsg ->
-            case model of
-                ViewReceipe receipe _ ->
-                    let
-                        groups =
-                            List.indexedMap
-                                (\i ig ->
-                                    if i == groupIndex then
-                                        updateIngredientGroup childMsg ig
-
-                                    else
-                                        ig
-                                )
-                                receipe.ingredients
-                    in
-                    ( ViewReceipe { receipe | ingredients = groups } Edit
-                    , Cmd.none
-                    )
-
-                _ ->
-                    ( model, Cmd.none )
 
         RoutedReceipeMsg childMsg ->
             case model of
@@ -285,6 +201,21 @@ updateReceipe msg model =
         RemoveIngredientGroup index ->
             { model | ingredients = removeElementAt index model.ingredients }
 
+        RoutedIngredientGroupMsg groupIndex childMsg ->
+            let
+                groups =
+                    List.indexedMap
+                        (\i ig ->
+                            if i == groupIndex then
+                                updateIngredientGroup childMsg ig
+
+                            else
+                                ig
+                        )
+                        model.ingredients
+            in
+            { model | ingredients = groups }
+
 
 updateIngredient : IngredientMsg -> Ingredient -> Ingredient
 updateIngredient msg model =
@@ -313,6 +244,21 @@ updateIngredientGroup msg model =
 
         RemoveIngredient index ->
             { model | ingredients = removeElementAt index model.ingredients }
+
+        RoutedIngredientMsg groupIndex index submsg ->
+            let
+                newIngredients =
+                    List.indexedMap
+                        (\i ing ->
+                            if i == index then
+                                updateIngredient submsg ing
+
+                            else
+                                ing
+                        )
+                        model.ingredients
+            in
+            { model | ingredients = newIngredients }
 
 
 
@@ -433,7 +379,7 @@ editIngredientGroup : Receipe -> Int -> IngredientGroup -> Html Msg
 editIngredientGroup receipe i ingredientGroup =
     let
         mapMessages =
-            Html.map (\msg -> RoutedIngredientGroupMsg i msg)
+            Html.map (\msg -> RoutedReceipeMsg (RoutedIngredientGroupMsg i msg))
     in
     div []
         [ mapMessages
@@ -485,7 +431,7 @@ viewUnit ingredient_unit_id units =
 editIngredient : Dict String Unit -> Int -> IngredientGroup -> Int -> Ingredient -> Html Msg
 editIngredient units i ingredientGroup j ingredient =
     li []
-        [ Html.map (\msg -> RoutedIngredientMsg i j msg)
+        [ Html.map (\msg -> RoutedReceipeMsg (RoutedIngredientGroupMsg i (RoutedIngredientMsg i j msg)))
             (div []
                 [ input
                     [ type_ "number"
@@ -509,7 +455,7 @@ editIngredient units i ingredientGroup j ingredient =
                     []
                 ]
             )
-        , Html.map (\msg -> RoutedIngredientGroupMsg i msg)
+        , Html.map (\msg -> RoutedReceipeMsg (RoutedIngredientGroupMsg i msg))
             (button [ onClick (RemoveIngredient j) ] [ text "-" ])
         ]
 
