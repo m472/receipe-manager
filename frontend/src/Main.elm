@@ -2,27 +2,9 @@ module Main exposing (..)
 
 import Browser
 import Dict exposing (Dict)
-import Html
-    exposing
-        ( Html
-        , a
-        , b
-        , br
-        , button
-        , div
-        , h1
-        , img
-        , input
-        , li
-        , main_
-        , option
-        , p
-        , select
-        , text
-        , ul
-        )
-import Html.Attributes exposing (height, href, name, src, type_, value, width)
-import Html.Events exposing (onClick, onInput)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Http
 import Json.Decode
     exposing
@@ -54,11 +36,15 @@ main =
 -- MODEL
 
 
+type Mode
+    = Display
+    | Edit
+
+
 type Model
     = Failure
     | Loading
-    | Display Receipe
-    | Edit Receipe
+    | ViewReceipe Receipe Mode
 
 
 init : () -> ( Model, Cmd Msg )
@@ -73,13 +59,6 @@ type alias Receipe =
     , servings : Servings
     , ingredients : List IngredientGroup
     , units : Dict String Unit
-    }
-
-
-type alias Unit =
-    { id : String
-    , symbol : String
-    , si_conversion_factor : Float
     }
 
 
@@ -103,19 +82,46 @@ type alias Ingredient =
     }
 
 
+type alias Unit =
+    { id : String
+    , symbol : String
+    , si_conversion_factor : Float
+    }
+
+
 
 -- UPDATE
 
 
 type Msg
     = GotReceipe (Result Http.Error Receipe)
-    | EditReceipe Receipe
-    | AddIngredientGroup Receipe
-    | AddIngredient Receipe IngredientGroup
-    | RemoveIngredientGroup Receipe IngredientGroup
-    | RemoveIngredient Receipe IngredientGroup Ingredient
-    | Save Receipe
+    | EditReceipe
+    | Save
     | CancelEdit
+    | RoutedIngredientMsg Int Int IngredientMsg
+    | RoutedIngredientGroupMsg Int IngredientGroupMsg
+    | RoutedReceipeMsg ReceipeMsg
+
+
+type ReceipeMsg
+    = AddIngredientGroup
+    | RemoveIngredientGroup Int
+    | UpdateTitle String
+    | UpdateServingsAmount String
+    | UpdateServingsUnit String
+
+
+type IngredientMsg
+    = UpdateName String
+    | UpdateUnit String
+    | UpdateComment String
+    | UpdateAmount String
+
+
+type IngredientGroupMsg
+    = UpdateGroupName String
+    | AddIngredient
+    | RemoveIngredient Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -124,75 +130,189 @@ update msg model =
         GotReceipe result ->
             case result of
                 Ok receipe ->
-                    ( Display receipe, Cmd.none )
+                    ( ViewReceipe receipe Display, Cmd.none )
 
                 Err _ ->
                     ( Failure, Cmd.none )
 
-        EditReceipe receipe ->
-            ( Edit receipe, Cmd.none )
+        EditReceipe ->
+            case model of
+                ViewReceipe receipe _ ->
+                    ( ViewReceipe receipe Edit, Cmd.none )
 
-        AddIngredientGroup receipe ->
-            ( Edit { receipe | ingredients = receipe.ingredients ++ [ IngredientGroup "" [] ] }
-            , Cmd.none
-            )
+                _ ->
+                    ( model, Cmd.none )
 
-        RemoveIngredientGroup receipe ingredientGroupToRemove ->
-            ( Edit
-                { receipe
-                    | ingredients =
-                        List.filter (\group -> group /= ingredientGroupToRemove) receipe.ingredients
-                }
-            , Cmd.none
-            )
+        {- }
+           AddIngredientGroup ->
+               case model of
+                   ViewReceipe receipe _ ->
+                       ( ViewReceipe
+                           { receipe
+                               | ingredients =
+                                   receipe.ingredients
+                                       ++ [ IngredientGroup "" [] ]
+                           }
+                           Edit
+                       , Cmd.none
+                       )
 
-        AddIngredient receipe ingredientGroup ->
-            let
-                addToGroup group =
-                    if group == ingredientGroup then
-                        { group
-                            | ingredients =
-                                group.ingredients ++ [ Ingredient Nothing "" "" Nothing ]
-                        }
+                   _ ->
+                       ( model, Cmd.none )
 
-                    else
-                        group
-            in
-            ( Edit { receipe | ingredients = List.map addToGroup receipe.ingredients }
-            , Cmd.none
-            )
+           RemoveIngredientGroup index ->
+               case model of
+                   ViewReceipe receipe _ ->
+                       ( ViewReceipe
+                           { receipe | ingredients = removeElementAt index receipe.ingredients }
+                           Edit
+                       , Cmd.none
+                       )
 
-        RemoveIngredient receipe ingredientGroup ingredientToRemove ->
-            let
-                updatedIngredientGroups =
-                    List.map
-                        (\ig ->
-                            if ig == ingredientGroup then
-                                { ingredientGroup
-                                    | ingredients =
-                                        List.filter
-                                            (\ingredient -> ingredient /= ingredientToRemove)
-                                            ingredientGroup.ingredients
-                                }
+                   _ ->
+                       ( model, Cmd.none )
+        -}
+        Save ->
+            case model of
+                ViewReceipe receipe _ ->
+                    ( ViewReceipe receipe Display, Cmd.none )
 
-                            else
-                                ig
-                        )
-                        receipe.ingredients
-            in
-            ( Edit { receipe | ingredients = updatedIngredientGroups }
-            , Cmd.none
-            )
-
-        Save receipe ->
-            ( Display receipe
-            , Cmd.none
-            )
+                _ ->
+                    ( model, Cmd.none )
 
         CancelEdit ->
             ( Loading
             , getReceipe
             )
+
+        RoutedIngredientMsg groupIndex index childMsg ->
+            case model of
+                ViewReceipe receipe _ ->
+                    let
+                        groups =
+                            List.indexedMap
+                                (\i ig ->
+                                    if i == groupIndex then
+                                        { ig
+                                            | ingredients =
+                                                List.indexedMap
+                                                    (\j ing ->
+                                                        if j == index then
+                                                            updateIngredient childMsg ing
+
+                                                        else
+                                                            ing
+                                                    )
+                                                    ig.ingredients
+                                        }
+
+                                    else
+                                        ig
+                                )
+                                receipe.ingredients
+                    in
+                    ( ViewReceipe { receipe | ingredients = groups } Edit
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        RoutedIngredientGroupMsg groupIndex childMsg ->
+            case model of
+                ViewReceipe receipe _ ->
+                    let
+                        groups =
+                            List.indexedMap
+                                (\i ig ->
+                                    if i == groupIndex then
+                                        updateIngredientGroup childMsg ig
+
+                                    else
+                                        ig
+                                )
+                                receipe.ingredients
+                    in
+                    ( ViewReceipe { receipe | ingredients = groups } Edit
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        RoutedReceipeMsg childMsg ->
+            case model of
+                ViewReceipe receipe Edit ->
+                    ( ViewReceipe (updateReceipe childMsg receipe) Edit
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+
+updateReceipe : ReceipeMsg -> Receipe -> Receipe
+updateReceipe msg model =
+    case msg of
+        AddIngredientGroup ->
+            { model | ingredients = model.ingredients ++ [ IngredientGroup "" [] ] }
+
+        UpdateTitle newName ->
+            { model | title = newName }
+
+        UpdateServingsUnit newUnit ->
+            let
+                servs =
+                    model.servings
+            in
+            { model | servings = { servs | unit = newUnit } }
+
+        UpdateServingsAmount amountStr ->
+            let
+                servs =
+                    model.servings
+
+                newAmount =
+                    String.toInt amountStr
+            in
+            case newAmount of
+                Just value ->
+                    { model | servings = { servs | amount = value } }
+
+                _ ->
+                    model
+
+        RemoveIngredientGroup index ->
+            { model | ingredients = removeElementAt index model.ingredients }
+
+
+updateIngredient : IngredientMsg -> Ingredient -> Ingredient
+updateIngredient msg model =
+    case msg of
+        UpdateName newName ->
+            { model | name = newName }
+
+        UpdateUnit newUnitId ->
+            { model | unit = newUnitId }
+
+        UpdateComment newComment ->
+            { model | comment = Just newComment }
+
+        UpdateAmount amountStr ->
+            { model | amount = String.toFloat amountStr }
+
+
+updateIngredientGroup : IngredientGroupMsg -> IngredientGroup -> IngredientGroup
+updateIngredientGroup msg model =
+    case msg of
+        UpdateGroupName newName ->
+            { model | name = newName }
+
+        AddIngredient ->
+            { model | ingredients = model.ingredients ++ [ Ingredient Nothing "" "" Nothing ] }
+
+        RemoveIngredient index ->
+            { model | ingredients = removeElementAt index model.ingredients }
 
 
 
@@ -222,49 +342,63 @@ viewReceipe model =
         Loading ->
             text "loading..."
 
-        Display receipe ->
-            div []
-                [ h1 [] [ text receipe.title ]
-                , viewImages receipe.id receipe.image_ids
-                , p []
-                    [ b []
-                        [ text
-                            ("Zutaten für "
-                                ++ String.fromInt receipe.servings.amount
-                                ++ " "
-                                ++ receipe.servings.unit
-                                ++ ":"
-                            )
-                        ]
-                    ]
-                , div [] (List.map (viewIngredientGroup receipe.units) receipe.ingredients)
-                , button [ onClick (EditReceipe receipe) ] [ text "edit" ]
-                ]
-
-        Edit receipe ->
-            div []
-                [ h1 [] [ text "Titel: ", input [ value receipe.title ] [] ]
-                , viewImages receipe.id receipe.image_ids
-                , p []
-                    [ b []
-                        [ text "Zutaten für "
-                        , input
-                            [ type_ "number"
-                            , value
-                                (String.fromInt receipe.servings.amount)
+        ViewReceipe receipe mode ->
+            case mode of
+                Display ->
+                    div []
+                        [ h1 [] [ text receipe.title ]
+                        , viewImages receipe.id receipe.image_ids
+                        , p []
+                            [ b []
+                                [ text
+                                    ("Zutaten für "
+                                        ++ String.fromInt receipe.servings.amount
+                                        ++ " "
+                                        ++ receipe.servings.unit
+                                        ++ ":"
+                                    )
+                                ]
                             ]
-                            []
-                        , text " "
-                        , input [ value receipe.servings.unit ] []
-                        , text ":"
+                        , div [] (List.map (viewIngredientGroup receipe.units) receipe.ingredients)
+                        , button [ onClick EditReceipe ] [ text "edit" ]
                         ]
-                    ]
-                , div [] (List.map (editIngredientGroup receipe) receipe.ingredients)
-                , button [ onClick (AddIngredientGroup receipe) ]
-                    [ text "Zutatengruppe hinzufügen" ]
-                , button [ onClick (Save receipe) ] [ text "Speichern" ]
-                , button [ onClick CancelEdit ] [ text "Abbrechen" ]
-                ]
+
+                Edit ->
+                    let
+                        routeMsgs =
+                            Html.map (\msg -> RoutedReceipeMsg msg)
+                    in
+                    div []
+                        [ routeMsgs (h1 [] [ text "Titel: ", input [ value receipe.title, onInput UpdateTitle ] [] ])
+                        , viewImages receipe.id receipe.image_ids
+                        , p []
+                            [ routeMsgs
+                                (b []
+                                    [ text "Zutaten für "
+                                    , input
+                                        [ type_ "number"
+                                        , value (String.fromInt receipe.servings.amount)
+                                        , onInput UpdateServingsAmount
+                                        ]
+                                        []
+                                    , text " "
+                                    , input
+                                        [ value receipe.servings.unit
+                                        , onInput UpdateServingsUnit
+                                        ]
+                                        []
+                                    , text ":"
+                                    ]
+                                )
+                            ]
+                        , div [] (List.indexedMap (editIngredientGroup receipe) receipe.ingredients)
+                        , Html.map (\msg -> RoutedReceipeMsg msg)
+                            (button [ onClick AddIngredientGroup ]
+                                [ text "Zutatengruppe hinzufügen" ]
+                            )
+                        , button [ onClick Save ] [ text "Speichern" ]
+                        , button [ onClick CancelEdit ] [ text "Abbrechen" ]
+                        ]
 
 
 viewImages : Int -> List Int -> Html Msg
@@ -295,13 +429,26 @@ viewIngredientGroup units ingredientGroup =
         ]
 
 
-editIngredientGroup : Receipe -> IngredientGroup -> Html Msg
-editIngredientGroup receipe ingredientGroup =
+editIngredientGroup : Receipe -> Int -> IngredientGroup -> Html Msg
+editIngredientGroup receipe i ingredientGroup =
+    let
+        mapMessages =
+            Html.map (\msg -> RoutedIngredientGroupMsg i msg)
+    in
     div []
-        [ b [] [ text "Zutatengruppe: ", input [ value ingredientGroup.name ] [] ]
-        , button [ onClick (RemoveIngredientGroup receipe ingredientGroup) ] [ text "entfernen" ]
-        , ul [] (List.map (editIngredient receipe ingredientGroup) ingredientGroup.ingredients)
-        , button [ onClick (AddIngredient receipe ingredientGroup) ] [ text "Zutat hinzufügen" ]
+        [ mapMessages
+            (b []
+                [ text "Zutatengruppe: "
+                , input [ value ingredientGroup.name, onInput UpdateGroupName ] []
+                ]
+            )
+        , Html.map (\msg -> RoutedReceipeMsg msg) (button [ onClick (RemoveIngredientGroup i) ] [ text "entfernen" ])
+        , ul []
+            (List.indexedMap
+                (editIngredient receipe.units i ingredientGroup)
+                ingredientGroup.ingredients
+            )
+        , mapMessages (button [ onClick AddIngredient ] [ text "Zutat hinzufügen" ])
         ]
 
 
@@ -335,18 +482,39 @@ viewUnit ingredient_unit_id units =
             "??"
 
 
-editIngredient : Receipe -> IngredientGroup -> Ingredient -> Html Msg
-editIngredient receipe ingredientGroup ingredient =
+editIngredient : Dict String Unit -> Int -> IngredientGroup -> Int -> Ingredient -> Html Msg
+editIngredient units i ingredientGroup j ingredient =
     li []
-        [ input [ type_ "number", value (viewMaybeFloat ingredient.amount) ] []
-        , editUnit ingredient.unit receipe.units
-        , text " "
-        , input [ type_ "text", value ingredient.name ] []
-        , button [ onClick (RemoveIngredient receipe ingredientGroup ingredient) ] [ text "-" ]
+        [ Html.map (\msg -> RoutedIngredientMsg i j msg)
+            (div []
+                [ input
+                    [ type_ "number"
+                    , value (viewMaybeFloat ingredient.amount)
+                    , onInput UpdateAmount
+                    ]
+                    []
+                , editUnit ingredient.unit units
+                , text " "
+                , input
+                    [ type_ "text"
+                    , value ingredient.name
+                    , onInput UpdateName
+                    ]
+                    []
+                , input
+                    [ type_ "text"
+                    , value (Maybe.withDefault "" ingredient.comment)
+                    , onInput UpdateComment
+                    ]
+                    []
+                ]
+            )
+        , Html.map (\msg -> RoutedIngredientGroupMsg i msg)
+            (button [ onClick (RemoveIngredient j) ] [ text "-" ])
         ]
 
 
-editUnit : String -> Dict String Unit -> Html Msg
+editUnit : String -> Dict.Dict String Unit -> Html IngredientMsg
 editUnit ingredient_unit_id units =
     let
         selected =
@@ -360,7 +528,8 @@ editUnit ingredient_unit_id units =
                 Nothing ->
                     units |> Dict.values
     in
-    select [] (List.map (\unit -> option [ value unit.id ] [ text unit.symbol ]) sortedUnits)
+    select [ onInput UpdateUnit ]
+        (List.map (\unit -> option [ value unit.id ] [ text unit.symbol ]) sortedUnits)
 
 
 
@@ -380,9 +549,9 @@ receipeDecoder =
     map6 Receipe
         (field "id" int)
         (field "title" string)
-        (field "image_ids" (list int))
+        (field "image_ids" (Json.Decode.list int))
         (field "servings" servingsDecoder)
-        (field "ingredients" (list ingredientGroupDecoder))
+        (field "ingredients" (Json.Decode.list ingredientGroupDecoder))
         (field "units" (dict unitDecoder))
 
 
@@ -397,7 +566,7 @@ ingredientGroupDecoder : Decoder IngredientGroup
 ingredientGroupDecoder =
     map2 IngredientGroup
         (field "name" string)
-        (field "ingredients" (list ingredientDecoder))
+        (field "ingredients" (Json.Decode.list ingredientDecoder))
 
 
 ingredientDecoder : Decoder Ingredient
@@ -415,3 +584,12 @@ unitDecoder =
         (field "id" string)
         (field "symbol" string)
         (field "si_conversion_factor" float)
+
+
+
+-- HELPERS
+
+
+removeElementAt : Int -> List a -> List a
+removeElementAt index list =
+    List.take index list ++ List.drop (index + 1) list
