@@ -2,6 +2,8 @@ module Main exposing (..)
 
 import Browser
 import Dict exposing (Dict)
+import FormatNumber exposing (format)
+import FormatNumber.Locales exposing (Decimals(..), usLocale)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -21,6 +23,7 @@ import Json.Decode
         , map6
         , nullable
         , string
+        , succeed
         )
 
 
@@ -44,12 +47,18 @@ type Mode
 type Model
     = Failure
     | Loading
-    | ViewReceipe Receipe Mode
+    | ViewReceipe ScaledReceipe Mode
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( Loading, getReceipe )
+
+
+type alias ScaledReceipe =
+    { receipe : Receipe
+    , servings : Int
+    }
 
 
 type alias Receipe =
@@ -98,6 +107,7 @@ type Msg
     | EditReceipe
     | Save
     | CancelEdit
+    | ReceipeServingsChanged String
     | RoutedReceipeMsg ReceipeMsg
 
 
@@ -130,7 +140,7 @@ update msg model =
         GotReceipe result ->
             case result of
                 Ok receipe ->
-                    ( ViewReceipe receipe Display, Cmd.none )
+                    ( ViewReceipe (ScaledReceipe receipe receipe.servings.amount) Display, Cmd.none )
 
                 Err _ ->
                     ( Failure, Cmd.none )
@@ -156,10 +166,24 @@ update msg model =
             , getReceipe
             )
 
+        ReceipeServingsChanged servingsStr ->
+            let
+                servingsFactor =
+                    String.toInt servingsStr
+            in
+            case ( servingsFactor, model ) of
+                ( Just value, ViewReceipe receipe Display ) ->
+                    ( ViewReceipe { receipe | servings = value } Display
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
         RoutedReceipeMsg childMsg ->
             case model of
-                ViewReceipe receipe Edit ->
-                    ( ViewReceipe (updateReceipe childMsg receipe) Edit
+                ViewReceipe scaled_receipe Edit ->
+                    ( ViewReceipe { scaled_receipe | receipe = updateReceipe childMsg scaled_receipe.receipe } Edit
                     , Cmd.none
                     )
 
@@ -276,75 +300,90 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    main_ [] [ viewReceipe model ]
+    main_ []
+        [ case model of
+            Failure ->
+                text "that went wrong..."
+
+            Loading ->
+                text "loading..."
+
+            ViewReceipe receipe mode ->
+                case mode of
+                    Display ->
+                        viewReceipe receipe
+
+                    Edit ->
+                        editReceipe receipe.receipe
+        ]
 
 
-viewReceipe : Model -> Html Msg
-viewReceipe model =
-    case model of
-        Failure ->
-            text "that went wrong..."
+viewReceipe : ScaledReceipe -> Html Msg
+viewReceipe scaled_receipe =
+    let
+        receipe =
+            scaled_receipe.receipe
 
-        Loading ->
-            text "loading..."
+        scaling_factor =
+            toFloat scaled_receipe.servings / toFloat receipe.servings.amount
+    in
+    div []
+        [ h1 [] [ text receipe.title ]
+        , viewImages receipe.id receipe.image_ids
+        , p []
+            [ b []
+                [ text "Zutaten für "
+                , input
+                    [ type_ "number"
+                    , value (String.fromInt scaled_receipe.servings)
+                    , onInput ReceipeServingsChanged
+                    ]
+                    []
+                , text (" " ++ receipe.servings.unit ++ ":")
+                ]
+            ]
+        , div [] (List.map (viewIngredientGroup scaling_factor receipe.units) receipe.ingredients)
+        , button [ onClick EditReceipe ] [ text "edit" ]
+        ]
 
-        ViewReceipe receipe mode ->
-            case mode of
-                Display ->
-                    div []
-                        [ h1 [] [ text receipe.title ]
-                        , viewImages receipe.id receipe.image_ids
-                        , p []
-                            [ b []
-                                [ text
-                                    ("Zutaten für "
-                                        ++ String.fromInt receipe.servings.amount
-                                        ++ " "
-                                        ++ receipe.servings.unit
-                                        ++ ":"
-                                    )
-                                ]
-                            ]
-                        , div [] (List.map (viewIngredientGroup receipe.units) receipe.ingredients)
-                        , button [ onClick EditReceipe ] [ text "edit" ]
+
+editReceipe : Receipe -> Html Msg
+editReceipe receipe =
+    let
+        routeMsgs =
+            Html.map (\msg -> RoutedReceipeMsg msg)
+    in
+    div []
+        [ routeMsgs (h1 [] [ text "Titel: ", input [ value receipe.title, onInput UpdateTitle ] [] ])
+        , viewImages receipe.id receipe.image_ids
+        , p []
+            [ routeMsgs
+                (b []
+                    [ text "Zutaten für "
+                    , input
+                        [ type_ "number"
+                        , value (String.fromInt receipe.servings.amount)
+                        , onInput UpdateServingsAmount
                         ]
-
-                Edit ->
-                    let
-                        routeMsgs =
-                            Html.map (\msg -> RoutedReceipeMsg msg)
-                    in
-                    div []
-                        [ routeMsgs (h1 [] [ text "Titel: ", input [ value receipe.title, onInput UpdateTitle ] [] ])
-                        , viewImages receipe.id receipe.image_ids
-                        , p []
-                            [ routeMsgs
-                                (b []
-                                    [ text "Zutaten für "
-                                    , input
-                                        [ type_ "number"
-                                        , value (String.fromInt receipe.servings.amount)
-                                        , onInput UpdateServingsAmount
-                                        ]
-                                        []
-                                    , text " "
-                                    , input
-                                        [ value receipe.servings.unit
-                                        , onInput UpdateServingsUnit
-                                        ]
-                                        []
-                                    , text ":"
-                                    ]
-                                )
-                            ]
-                        , div [] (List.indexedMap (editIngredientGroup receipe) receipe.ingredients)
-                        , Html.map (\msg -> RoutedReceipeMsg msg)
-                            (button [ onClick AddIngredientGroup ]
-                                [ text "Zutatengruppe hinzufügen" ]
-                            )
-                        , button [ onClick Save ] [ text "Speichern" ]
-                        , button [ onClick CancelEdit ] [ text "Abbrechen" ]
+                        []
+                    , text " "
+                    , input
+                        [ value receipe.servings.unit
+                        , onInput UpdateServingsUnit
                         ]
+                        []
+                    , text ":"
+                    ]
+                )
+            ]
+        , div [] (List.indexedMap (editIngredientGroup receipe) receipe.ingredients)
+        , Html.map (\msg -> RoutedReceipeMsg msg)
+            (button [ onClick AddIngredientGroup ]
+                [ text "Zutatengruppe hinzufügen" ]
+            )
+        , button [ onClick Save ] [ text "Speichern" ]
+        , button [ onClick CancelEdit ] [ text "Abbrechen" ]
+        ]
 
 
 viewImages : Int -> List Int -> Html Msg
@@ -367,11 +406,11 @@ viewImages receipe_id image_ids =
         )
 
 
-viewIngredientGroup : Dict String Unit -> IngredientGroup -> Html Msg
-viewIngredientGroup units ingredientGroup =
+viewIngredientGroup : Float -> Dict String Unit -> IngredientGroup -> Html Msg
+viewIngredientGroup factor units ingredientGroup =
     div []
         [ b [] [ text ingredientGroup.name ]
-        , ul [] (List.map (viewIngredient units) ingredientGroup.ingredients)
+        , ul [] (List.map (viewIngredient factor units) ingredientGroup.ingredients)
         ]
 
 
@@ -398,21 +437,23 @@ editIngredientGroup receipe i ingredientGroup =
         ]
 
 
-viewIngredient : Dict String Unit -> Ingredient -> Html Msg
-viewIngredient units ingredient =
+viewIngredient : Float -> Dict String Unit -> Ingredient -> Html Msg
+viewIngredient factor units ingredient =
     li []
-        [ text (viewMaybeFloat ingredient.amount)
+        [ text (viewMaybeFloat factor ingredient.amount)
         , text (viewUnit ingredient.unit units)
         , text " "
         , text ingredient.name
+        , text " "
+        , text (Maybe.withDefault "" ingredient.comment)
         ]
 
 
-viewMaybeFloat : Maybe Float -> String
-viewMaybeFloat value =
+viewMaybeFloat : Float -> Maybe Float -> String
+viewMaybeFloat factor value =
     case value of
         Just floatValue ->
-            String.fromFloat floatValue
+            format { usLocale | decimals = Max 1, thousandSeparator = "'" } (factor * floatValue)
 
         Nothing ->
             ""
@@ -434,7 +475,7 @@ editIngredient units i ingredientGroup j ingredient =
         (List.map (Html.map (\msg -> RoutedReceipeMsg (RoutedIngredientGroupMsg i (RoutedIngredientMsg i j msg))))
             [ input
                 [ type_ "number"
-                , value (viewMaybeFloat ingredient.amount)
+                , value (viewMaybeFloat 1 ingredient.amount)
                 , onInput UpdateAmount
                 ]
                 []
