@@ -109,57 +109,16 @@ COOKBOOK = Cookbook.load()
 
 @app.route("/")
 def home() -> str:
-    return render_template("home.html", cookbook=Cookbook.load())
-
-
-def try_parse(_type: Type[_TNumber], arg: str) -> _TNumber | None:
-    try:
-        return _type(arg)
-    except ValueError:
-        return None
-
-
-@app.route("/receipe")
-def display_receipe() -> str:
-    _id = int(request.args["id"])
-    receipe = deepcopy(COOKBOOK.receipes[_id])
-
-    if "factor" in request.args:
-        for t in [int, float]:
-            factor = try_parse(t, request.args["factor"])
-            if factor is not None:
-                break
-        else:
-            factor = 1
-    else:
-        factor = 1
-
-    return render_template(
-        "receipe.html",
-        receipe=receipe.multiply_by(factor),
-        image_ids=receipe.get_image_ids(),
-        units=COOKBOOK.units,
-    )
+    return render_template("home.html")
 
 
 @app.route("/receipe/json")
 def json_receipe() -> Response:
     _id = int(request.args["id"])
-    receipe = deepcopy(COOKBOOK.receipes[_id])
 
-    if "factor" in request.args:
-        for t in [int, float]:
-            factor = try_parse(t, request.args["factor"])
-            if factor is not None:
-                break
-        else:
-            factor = 1
-    else:
-        factor = 1
-
+    receipe = COOKBOOK.receipes[_id]
     receipe.image_ids = receipe.get_image_ids()
-
-    return jsonify(asdict(receipe.multiply_by(factor)) | {"units": COOKBOOK.units})
+    return jsonify(asdict(receipe) | {"units": COOKBOOK.units})
 
 
 @app.route("/receipe/json/update", methods=["POST"])
@@ -187,24 +146,6 @@ def get_image() -> Response:
     receipe_id = int(request.args["receipe_id"])
     image_id = int(request.args["image_id"])
     return send_from_directory(RECEIPE_IMG_DIR, f"{receipe_id}_{image_id}.jpg")
-
-
-@app.route("/receipe/edit")
-def edit_receipe() -> str:
-    _id = int(request.args["id"])
-    receipe = COOKBOOK.receipes[_id]
-
-    return render_template(
-        "edit_receipe.html",
-        receipe=receipe,
-        image_ids=receipe.get_image_ids(),
-        units=COOKBOOK.units,
-    )
-
-
-@app.route("/receipe/update")
-def update_receipe() -> Response:
-    return redirect("edit_receipe")
 
 
 if __name__ == "__main__":
