@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Browser
+import Debug
 import Dict exposing (Dict)
 import FormatNumber exposing (format)
 import FormatNumber.Locales exposing (Decimals(..), usLocale)
@@ -25,6 +26,7 @@ import Json.Decode
         , string
         , succeed
         )
+import Json.Encode as JE
 
 
 
@@ -47,7 +49,7 @@ type Mode
 type Model
     = Failure
     | Loading
-    | ViewReceipe ScaledReceipe Mode
+    | ViewReceipe ScaledReceipe Mode String
 
 
 init : () -> ( Model, Cmd Msg )
@@ -109,6 +111,7 @@ type Msg
     | CancelEdit
     | ReceipeServingsChanged String
     | RoutedReceipeMsg ReceipeMsg
+    | Uploaded (Result Http.Error ())
 
 
 type ReceipeMsg
@@ -140,23 +143,23 @@ update msg model =
         GotReceipe result ->
             case result of
                 Ok receipe ->
-                    ( ViewReceipe (ScaledReceipe receipe receipe.servings.amount) Display, Cmd.none )
+                    ( ViewReceipe (ScaledReceipe receipe receipe.servings.amount) Display "", Cmd.none )
 
                 Err _ ->
                     ( Failure, Cmd.none )
 
         EditReceipe ->
             case model of
-                ViewReceipe receipe _ ->
-                    ( ViewReceipe receipe Edit, Cmd.none )
+                ViewReceipe receipe _ info ->
+                    ( ViewReceipe receipe Edit info, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
         Save ->
             case model of
-                ViewReceipe receipe Edit ->
-                    ( ViewReceipe receipe Display, Cmd.none )
+                ViewReceipe scaled_receipe Edit info ->
+                    ( ViewReceipe scaled_receipe Display info, sendReceipe scaled_receipe.receipe )
 
                 _ ->
                     ( model, Cmd.none )
@@ -172,8 +175,8 @@ update msg model =
                     String.toInt servingsStr
             in
             case ( servingsFactor, model ) of
-                ( Just value, ViewReceipe receipe Display ) ->
-                    ( ViewReceipe { receipe | servings = value } Display
+                ( Just value, ViewReceipe receipe Display info ) ->
+                    ( ViewReceipe { receipe | servings = value } Display info
                     , Cmd.none
                     )
 
@@ -182,13 +185,16 @@ update msg model =
 
         RoutedReceipeMsg childMsg ->
             case model of
-                ViewReceipe scaled_receipe Edit ->
-                    ( ViewReceipe { scaled_receipe | receipe = updateReceipe childMsg scaled_receipe.receipe } Edit
+                ViewReceipe scaled_receipe Edit info ->
+                    ( ViewReceipe { scaled_receipe | receipe = updateReceipe childMsg scaled_receipe.receipe } Edit info
                     , Cmd.none
                     )
 
                 _ ->
                     ( model, Cmd.none )
+
+        Uploaded _ ->
+            ( model, Cmd.none )
 
 
 updateReceipe : ReceipeMsg -> Receipe -> Receipe
@@ -285,6 +291,15 @@ updateIngredientGroup msg model =
             { model | ingredients = newIngredients }
 
 
+sendReceipe : Receipe -> Cmd Msg
+sendReceipe receipe =
+    Http.post
+        { url = "/receipe/json/update?id=0"
+        , body = Http.jsonBody (receipeEncoder receipe)
+        , expect = Http.expectWhatever Uploaded
+        }
+
+
 
 -- SUBSCRIPTIONS
 
@@ -308,7 +323,7 @@ view model =
             Loading ->
                 text "loading..."
 
-            ViewReceipe receipe mode ->
+            ViewReceipe receipe mode msg ->
                 case mode of
                     Display ->
                         viewReceipe receipe
@@ -571,6 +586,48 @@ unitDecoder =
         (field "symbol" string)
         (field "si_conversion_factor" float)
 
+-- ENCODERS
+
+receipeEncoder : Receipe -> JE.Value
+receipeEncoder receipe =
+    JE.object
+    [ ("title", JE.string receipe.title)
+    , ("id", JE.int receipe.id)
+    , ("ingredients", JE.list ingredientGroupEncoder receipe.ingredients)
+    , ("image_ids", JE.list JE.int receipe.image_ids)
+    , ("servings", servingsEncoder receipe.servings)
+    ]
+
+ingredientGroupEncoder : IngredientGroup -> JE.Value
+ingredientGroupEncoder group =
+    JE.object
+    [ ("name", JE.string group.name)
+    , ("ingredients", JE.list ingredientEncoder group.ingredients)
+    ]
+
+ingredientEncoder : Ingredient -> JE.Value
+ingredientEncoder ingredient =
+    JE.object
+    [ ("amount", maybeEncoder JE.float ingredient.amount)
+    , ("unit", JE.string ingredient.unit)
+    , ("name", JE.string ingredient.name)
+    , ("comment", maybeEncoder JE.string ingredient.comment)
+    ]
+
+servingsEncoder : Servings -> JE.Value
+servingsEncoder servings =
+    JE.object
+    [ ("amount", JE.int servings.amount)
+    , ("unit", JE.string servings.unit)
+    ]
+
+maybeEncoder : (a -> JE.Value) -> Maybe a -> JE.Value
+maybeEncoder f value =
+    case value of
+        Just val ->
+            f val
+        Nothing ->
+            JE.null
 
 
 -- HELPERS

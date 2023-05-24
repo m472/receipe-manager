@@ -14,8 +14,8 @@ from flask import (
     send_from_directory,
 )
 from werkzeug.wrappers.response import Response
-from serde.json import from_json
-from serde import from_dict
+from serde.json import from_json, to_json
+from serde import SerdeError, from_dict
 
 _T = TypeVar("_T")
 _TNumber = TypeVar("_TNumber", int, float)
@@ -60,7 +60,7 @@ class Receipe:
     id: int
     title: str
     ingredients: list[IngredientGroup]
-    servings: Servings | None = None
+    servings: Servings
     image_ids: list[int] | None = None
 
     def get_image_ids(self) -> list[int]:
@@ -160,6 +160,26 @@ def json_receipe() -> Response:
     receipe.image_ids = receipe.get_image_ids()
 
     return jsonify(asdict(receipe.multiply_by(factor)) | {"units": COOKBOOK.units})
+
+
+@app.route("/receipe/json/update", methods=["POST"])
+def json_receipe_update() -> tuple[Response, int]:
+    try:
+        id = int(request.args["id"])
+        receipe = from_json(Receipe, request.data)
+        COOKBOOK.receipes[id] = receipe
+        (RECEIPE_DIR / f"{id}.json").write_text(to_json(receipe))
+
+    except SerdeError as se:
+        status_code = 400
+        status = f"Parsing Error: {se}"
+        print(request.data)
+
+    else:
+        status_code = 200
+        status = "success"
+
+    return (jsonify({"status": status}), status_code)
 
 
 @app.route("/receipe/image")
