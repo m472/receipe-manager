@@ -1,24 +1,19 @@
 from __future__ import annotations
+
 import json
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from copy import deepcopy
-from typing import TypeVar, Type, cast
+from typing import TYPE_CHECKING, Type, TypeVar
 
-from flask import (
-    Flask,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    send_from_directory,
-)
-from werkzeug.wrappers.response import Response
-from serde.json import from_json, to_json
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from serde import SerdeError, from_dict
+from serde.json import from_json, to_json
+
+if TYPE_CHECKING:
+    from werkzeug.wrappers.response import Response
 
 _T = TypeVar("_T")
-_TNumber = TypeVar("_TNumber", int, float)
 
 app = Flask(__name__)
 
@@ -96,9 +91,7 @@ class Cookbook:
             for f in RECEIPE_DIR.iterdir()
             if f.is_file() and f.name.endswith(".json")
         ]
-        units = [
-            cast(Unit, from_dict(Unit, f)) for f in json.loads(UNITS_FILE.read_text())
-        ]
+        units = [from_dict(Unit, f) for f in json.loads(UNITS_FILE.read_text())]
         return Cookbook(
             receipes={r.id: r for r in receipes}, units={u.id: u for u in units}
         )
