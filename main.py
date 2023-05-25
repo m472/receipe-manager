@@ -112,7 +112,21 @@ def home() -> str:
     return render_template("home.html")
 
 
-@app.route("/receipe/json")
+@app.route("/receipe/list")
+def receipe_list() -> Response:
+    return jsonify(
+        [
+            {
+                "id": id,
+                "title": receipe.title,
+                "image_ids": receipe.image_ids,
+            }
+            for id, receipe in COOKBOOK.receipes.items()
+        ]
+    )
+
+
+@app.route("/receipe")
 def json_receipe() -> Response:
     _id = int(request.args["id"])
 
@@ -121,7 +135,7 @@ def json_receipe() -> Response:
     return jsonify(asdict(receipe) | {"units": COOKBOOK.units})
 
 
-@app.route("/receipe/json/update", methods=["POST"])
+@app.route("/receipe/update", methods=["POST"])
 def json_receipe_update() -> tuple[Response, int]:
     try:
         id = int(request.args["id"])
