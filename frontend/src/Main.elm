@@ -42,7 +42,8 @@ type Mode
 type Model
     = Failure
     | Loading
-    | ViewReceipe ScaledReceipe Mode String
+    | ReceipeViewer ScaledReceipe String
+    | ReceipeEditor Receipe
     | ViewReceipeList (List ReceipePreview)
 
 
@@ -147,7 +148,7 @@ update msg model =
         GotReceipe result ->
             case result of
                 Ok receipe ->
-                    ( ViewReceipe (ScaledReceipe receipe receipe.servings.amount) Display "", Cmd.none )
+                    ( ReceipeViewer (ScaledReceipe receipe receipe.servings.amount) "", Cmd.none )
 
                 Err _ ->
                     ( Failure, Cmd.none )
@@ -162,16 +163,16 @@ update msg model =
 
         EditReceipe ->
             case model of
-                ViewReceipe receipe _ info ->
-                    ( ViewReceipe receipe Edit info, Cmd.none )
+                ReceipeViewer scaled_receipe info ->
+                    ( ReceipeEditor scaled_receipe.receipe, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
         Save ->
             case model of
-                ViewReceipe scaled_receipe Edit info ->
-                    ( ViewReceipe scaled_receipe Display info, sendReceipe scaled_receipe.receipe )
+                ReceipeEditor receipe ->
+                    ( ReceipeEditor receipe, sendReceipe receipe )
 
                 _ ->
                     ( model, Cmd.none )
@@ -187,8 +188,8 @@ update msg model =
                     String.toInt servingsStr
             in
             case ( servingsFactor, model ) of
-                ( Just value, ViewReceipe receipe Display info ) ->
-                    ( ViewReceipe { receipe | servings = value } Display info
+                ( Just value, ReceipeViewer scaled_receipe info ) ->
+                    ( ReceipeViewer { scaled_receipe | servings = value } info
                     , Cmd.none
                     )
 
@@ -197,8 +198,8 @@ update msg model =
 
         RoutedReceipeMsg childMsg ->
             case model of
-                ViewReceipe scaled_receipe Edit info ->
-                    ( ViewReceipe { scaled_receipe | receipe = updateReceipe childMsg scaled_receipe.receipe } Edit info
+                ReceipeEditor receipe ->
+                    ( ReceipeEditor (updateReceipe childMsg receipe)
                     , Cmd.none
                     )
 
@@ -343,13 +344,11 @@ view model =
                 Loading ->
                     text "loading..."
 
-                ViewReceipe receipe mode msg ->
-                    case mode of
-                        Display ->
-                            viewReceipe receipe
+                ReceipeViewer receipe msg ->
+                    viewReceipe receipe
 
-                        Edit ->
-                            editReceipe receipe.receipe
+                ReceipeEditor receipe ->
+                    editReceipe receipe
 
                 ViewReceipeList receipeList ->
                     viewReceipeList receipeList
