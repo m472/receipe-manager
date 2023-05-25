@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Browser
+import Browser.Navigation
 import Debug
 import Dict exposing (Dict)
 import FormatNumber exposing (format)
@@ -9,24 +10,9 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
-import Json.Decode
-    exposing
-        ( Decoder
-        , dict
-        , field
-        , float
-        , int
-        , list
-        , map2
-        , map3
-        , map4
-        , map5
-        , map6
-        , nullable
-        , string
-        , succeed
-        )
+import Json.Decode as JD
 import Json.Encode as JE
+import Url
 
 
 
@@ -34,7 +20,14 @@ import Json.Encode as JE
 
 
 main =
-    Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
+    Browser.application
+        { init = init
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
+        , update = update
+        , view = view
+        , subscriptions = subscriptions
+        }
 
 
 
@@ -50,11 +43,12 @@ type Model
     = Failure
     | Loading
     | ViewReceipe ScaledReceipe Mode String
+    | ViewReceipeList (List ReceipePreview)
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( Loading, getReceipe )
+init : () -> Url.Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
+init flags url nav =
+    ( Loading, getReceipeList )
 
 
 type alias ScaledReceipe =
@@ -100,18 +94,28 @@ type alias Unit =
     }
 
 
+type alias ReceipePreview =
+    { id : Int
+    , title : String
+    , image_ids : List Int
+    }
+
+
 
 -- UPDATE
 
 
 type Msg
     = GotReceipe (Result Http.Error Receipe)
+    | GotReceipeList (Result Http.Error (List ReceipePreview))
     | EditReceipe
     | Save
     | CancelEdit
     | ReceipeServingsChanged String
     | RoutedReceipeMsg ReceipeMsg
     | Uploaded (Result Http.Error ())
+    | LinkClicked Browser.UrlRequest
+    | UrlChanged Url.Url
 
 
 type ReceipeMsg
@@ -144,6 +148,14 @@ update msg model =
             case result of
                 Ok receipe ->
                     ( ViewReceipe (ScaledReceipe receipe receipe.servings.amount) Display "", Cmd.none )
+
+                Err _ ->
+                    ( Failure, Cmd.none )
+
+        GotReceipeList result ->
+            case result of
+                Ok receipes ->
+                    ( ViewReceipeList receipes, Cmd.none )
 
                 Err _ ->
                     ( Failure, Cmd.none )
@@ -194,6 +206,12 @@ update msg model =
                     ( model, Cmd.none )
 
         Uploaded _ ->
+            ( model, Cmd.none )
+
+        UrlChanged url ->
+            ( model, Cmd.none )
+
+        LinkClicked url ->
             ( model, Cmd.none )
 
 
@@ -294,7 +312,7 @@ updateIngredientGroup msg model =
 sendReceipe : Receipe -> Cmd Msg
 sendReceipe receipe =
     Http.post
-        { url = "/receipe/json/update?id=0"
+        { url = "/receipe/update?id=0"
         , body = Http.jsonBody (receipeEncoder receipe)
         , expect = Http.expectWhatever Uploaded
         }
@@ -313,23 +331,46 @@ subscriptions model =
 -- VIEW
 
 
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
-    main_ []
-        [ case model of
-            Failure ->
-                text "that went wrong..."
+    Browser.Document
+        "Receipe Manager"
+        [ main_ []
+            [ case model of
+                Failure ->
+                    text "that went wrong..."
 
-            Loading ->
-                text "loading..."
+                Loading ->
+                    text "loading..."
 
-            ViewReceipe receipe mode msg ->
-                case mode of
-                    Display ->
-                        viewReceipe receipe
+                ViewReceipe receipe mode msg ->
+                    case mode of
+                        Display ->
+                            viewReceipe receipe
 
-                    Edit ->
-                        editReceipe receipe.receipe
+                        Edit ->
+                            editReceipe receipe.receipe
+
+                ViewReceipeList receipeList ->
+                    viewReceipeList receipeList
+            ]
+        ]
+
+
+viewReceipeList : List ReceipePreview -> Html Msg
+viewReceipeList receipeList =
+    div []
+        [ h1 [] [ text "Rezepte-Übersicht" ]
+        , ul []
+            (List.map
+                (\receipe ->
+                    li []
+                        [ a [ href ("/receipe?id=" ++ String.fromInt receipe.id) ]
+                            [ text receipe.title ]
+                        ]
+                )
+                receipeList
+            )
         ]
 
 
@@ -537,97 +578,124 @@ editUnit ingredient_unit_id units =
 -- HTTP
 
 
+getReceipeList : Cmd Msg
+getReceipeList =
+    Http.get
+        { url = "/receipe/list"
+        , expect = Http.expectJson GotReceipeList receipeListDecoder
+        }
+
+
+receipeListDecoder : JD.Decoder (List ReceipePreview)
+receipeListDecoder =
+    JD.list
+        (JD.map3 ReceipePreview
+            (JD.field "id" JD.int)
+            (JD.field "title" JD.string)
+            (JD.field "image_ids" (JD.list JD.int))
+        )
+
+
 getReceipe : Cmd Msg
 getReceipe =
     Http.get
-        { url = "/receipe/json?id=0"
+        { url = "/receipe?id=0"
         , expect = Http.expectJson GotReceipe receipeDecoder
         }
 
 
-receipeDecoder : Decoder Receipe
+receipeDecoder : JD.Decoder Receipe
 receipeDecoder =
-    map6 Receipe
-        (field "id" int)
-        (field "title" string)
-        (field "image_ids" (Json.Decode.list int))
-        (field "servings" servingsDecoder)
-        (field "ingredients" (Json.Decode.list ingredientGroupDecoder))
-        (field "units" (dict unitDecoder))
+    JD.map6 Receipe
+        (JD.field "id" JD.int)
+        (JD.field "title" JD.string)
+        (JD.field "image_ids" (JD.list JD.int))
+        (JD.field "servings" servingsDecoder)
+        (JD.field "ingredients" (JD.list ingredientGroupDecoder))
+        (JD.field "units" (JD.dict unitDecoder))
 
 
-servingsDecoder : Decoder Servings
+servingsDecoder : JD.Decoder Servings
 servingsDecoder =
-    map2 Servings
-        (field "amount" int)
-        (field "unit" string)
+    JD.map2 Servings
+        (JD.field "amount" JD.int)
+        (JD.field "unit" JD.string)
 
 
-ingredientGroupDecoder : Decoder IngredientGroup
+ingredientGroupDecoder : JD.Decoder IngredientGroup
 ingredientGroupDecoder =
-    map2 IngredientGroup
-        (field "name" string)
-        (field "ingredients" (Json.Decode.list ingredientDecoder))
+    JD.map2 IngredientGroup
+        (JD.field "name" JD.string)
+        (JD.field "ingredients" (JD.list ingredientDecoder))
 
 
-ingredientDecoder : Decoder Ingredient
+ingredientDecoder : JD.Decoder Ingredient
 ingredientDecoder =
-    map4 Ingredient
-        (field "amount" (nullable float))
-        (field "unit" string)
-        (field "name" string)
-        (field "comment" (nullable string))
+    JD.map4 Ingredient
+        (JD.field "amount" (JD.nullable JD.float))
+        (JD.field "unit" JD.string)
+        (JD.field "name" JD.string)
+        (JD.field "comment" (JD.nullable JD.string))
 
 
-unitDecoder : Decoder Unit
+unitDecoder : JD.Decoder Unit
 unitDecoder =
-    map3 Unit
-        (field "id" string)
-        (field "symbol" string)
-        (field "si_conversion_factor" float)
+    JD.map3 Unit
+        (JD.field "id" JD.string)
+        (JD.field "symbol" JD.string)
+        (JD.field "si_conversion_factor" JD.float)
+
+
 
 -- ENCODERS
+
 
 receipeEncoder : Receipe -> JE.Value
 receipeEncoder receipe =
     JE.object
-    [ ("title", JE.string receipe.title)
-    , ("id", JE.int receipe.id)
-    , ("ingredients", JE.list ingredientGroupEncoder receipe.ingredients)
-    , ("image_ids", JE.list JE.int receipe.image_ids)
-    , ("servings", servingsEncoder receipe.servings)
-    ]
+        [ ( "title", JE.string receipe.title )
+        , ( "id", JE.int receipe.id )
+        , ( "ingredients", JE.list ingredientGroupEncoder receipe.ingredients )
+        , ( "image_ids", JE.list JE.int receipe.image_ids )
+        , ( "servings", servingsEncoder receipe.servings )
+        ]
+
 
 ingredientGroupEncoder : IngredientGroup -> JE.Value
 ingredientGroupEncoder group =
     JE.object
-    [ ("name", JE.string group.name)
-    , ("ingredients", JE.list ingredientEncoder group.ingredients)
-    ]
+        [ ( "name", JE.string group.name )
+        , ( "ingredients", JE.list ingredientEncoder group.ingredients )
+        ]
+
 
 ingredientEncoder : Ingredient -> JE.Value
 ingredientEncoder ingredient =
     JE.object
-    [ ("amount", maybeEncoder JE.float ingredient.amount)
-    , ("unit", JE.string ingredient.unit)
-    , ("name", JE.string ingredient.name)
-    , ("comment", maybeEncoder JE.string ingredient.comment)
-    ]
+        [ ( "amount", maybeEncoder JE.float ingredient.amount )
+        , ( "unit", JE.string ingredient.unit )
+        , ( "name", JE.string ingredient.name )
+        , ( "comment", maybeEncoder JE.string ingredient.comment )
+        ]
+
 
 servingsEncoder : Servings -> JE.Value
 servingsEncoder servings =
     JE.object
-    [ ("amount", JE.int servings.amount)
-    , ("unit", JE.string servings.unit)
-    ]
+        [ ( "amount", JE.int servings.amount )
+        , ( "unit", JE.string servings.unit )
+        ]
+
 
 maybeEncoder : (a -> JE.Value) -> Maybe a -> JE.Value
 maybeEncoder f value =
     case value of
         Just val ->
             f val
+
         Nothing ->
             JE.null
+
 
 
 -- HELPERS
