@@ -1,7 +1,7 @@
 module Main exposing (..)
 
 import Browser
-import Browser.Navigation
+import Browser.Navigation as Nav
 import Debug
 import Dict exposing (Dict)
 import FormatNumber exposing (format)
@@ -13,6 +13,8 @@ import Http
 import Json.Decode as JD
 import Json.Encode as JE
 import Url
+import Url.Parser exposing ((</>), (<?>))
+import Url.Parser.Query as Query
 
 
 
@@ -39,7 +41,7 @@ type Mode
     | Edit
 
 
-type Model
+type ModelContent
     = Failure
     | Loading
     | ReceipeViewer ScaledReceipe String
@@ -47,9 +49,16 @@ type Model
     | ViewReceipeList (List ReceipePreview)
 
 
-init : () -> Url.Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
-init flags url nav =
-    ( Loading, getReceipeList )
+type alias Model =
+    { key : Nav.Key
+    , url : Url.Url
+    , content : ModelContent
+    }
+
+
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
+    ( Model key url Loading, getReceipeList )
 
 
 type alias ScaledReceipe =
@@ -148,72 +157,111 @@ update msg model =
         GotReceipe result ->
             case result of
                 Ok receipe ->
-                    ( ReceipeViewer (ScaledReceipe receipe receipe.servings.amount) "", Cmd.none )
+                    ( { model | content = ReceipeViewer (ScaledReceipe receipe receipe.servings.amount) "" }, Cmd.none )
 
                 Err _ ->
-                    ( Failure, Cmd.none )
+                    ( { model | content = Failure }, Cmd.none )
 
         GotReceipeList result ->
             case result of
                 Ok receipes ->
-                    ( ViewReceipeList receipes, Cmd.none )
+                    ( { model | content = ViewReceipeList receipes }, Cmd.none )
 
                 Err _ ->
-                    ( Failure, Cmd.none )
+                    ( { model | content = Failure }, Cmd.none )
 
         EditReceipe ->
-            case model of
+            case model.content of
                 ReceipeViewer scaled_receipe info ->
-                    ( ReceipeEditor scaled_receipe.receipe, Cmd.none )
+                    ( { model | content = ReceipeEditor scaled_receipe.receipe }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
         Save ->
-            case model of
+            case model.content of
                 ReceipeEditor receipe ->
-                    ( ReceipeEditor receipe, sendReceipe receipe )
+                    ( { model | content = ReceipeEditor receipe }, sendReceipe receipe )
 
                 _ ->
                     ( model, Cmd.none )
 
         CancelEdit ->
-            ( Loading
-            , getReceipe
-            )
+            case model.content of
+                ReceipeEditor receipe ->
+                    ( { model | content = Loading }
+                    , getReceipe receipe.id
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
 
         ReceipeServingsChanged servingsStr ->
             let
                 servingsFactor =
                     String.toInt servingsStr
             in
-            case ( servingsFactor, model ) of
+            case ( servingsFactor, model.content ) of
                 ( Just value, ReceipeViewer scaled_receipe info ) ->
-                    ( ReceipeViewer { scaled_receipe | servings = value } info
+                    ( { model | content = ReceipeViewer { scaled_receipe | servings = value } info }
                     , Cmd.none
                     )
 
-                _ ->
+                ( _, _ ) ->
                     ( model, Cmd.none )
 
         RoutedReceipeMsg childMsg ->
-            case model of
+            case model.content of
                 ReceipeEditor receipe ->
-                    ( ReceipeEditor (updateReceipe childMsg receipe)
+                    ( { model
+                        | content =
+                            ReceipeEditor (updateReceipe childMsg receipe)
+                      }
                     , Cmd.none
                     )
 
                 _ ->
                     ( model, Cmd.none )
 
-        Uploaded _ ->
-            ( model, Cmd.none )
+        Uploaded result ->
+            case ( result, model.content ) of
+                ( Ok _, ReceipeEditor receipe ) ->
+                    ( { model
+                        | content =
+                            ReceipeViewer
+                                { receipe = receipe
+                                , servings = receipe.servings.amount
+                                }
+                                "Receipe successfully saved"
+                      }
+                    , Cmd.none
+                    )
+
+                ( _, _ ) ->
+                    ( model, Cmd.none )
 
         UrlChanged url ->
-            ( model, Cmd.none )
+            case Url.Parser.parse routeParser url of
+                Just (ReceipeRoute id) ->
+                    ( { model | content = Loading }, getReceipe id )
 
-        LinkClicked url ->
-            ( model, Cmd.none )
+                Just (EditReceipeRoute id) ->
+                    ( { model | content = Loading }, getReceipe id )
+
+                Just OverviewRoute ->
+                    ( {model | content = Loading }, getReceipeList)
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
+
+                Browser.External href ->
+                    ( model, Nav.load href )
 
 
 updateReceipe : ReceipeMsg -> Receipe -> Receipe
@@ -313,7 +361,7 @@ updateIngredientGroup msg model =
 sendReceipe : Receipe -> Cmd Msg
 sendReceipe receipe =
     Http.post
-        { url = "/receipe/update?id=0"
+        { url = "/receipe/update?id=" ++ (String.fromInt receipe.id)
         , body = Http.jsonBody (receipeEncoder receipe)
         , expect = Http.expectWhatever Uploaded
         }
@@ -337,7 +385,7 @@ view model =
     Browser.Document
         "Receipe Manager"
         [ main_ []
-            [ case model of
+            [ case model.content of
                 Failure ->
                     text "that went wrong..."
 
@@ -364,7 +412,7 @@ viewReceipeList receipeList =
             (List.map
                 (\receipe ->
                     li []
-                        [ a [ href ("/receipe?id=" ++ String.fromInt receipe.id) ]
+                        [ a [ href ("/receipe/" ++ String.fromInt receipe.id) ]
                             [ text receipe.title ]
                         ]
                 )
@@ -595,10 +643,10 @@ receipeListDecoder =
         )
 
 
-getReceipe : Cmd Msg
-getReceipe =
+getReceipe : Int -> Cmd Msg
+getReceipe id =
     Http.get
-        { url = "/receipe?id=0"
+        { url = "/receipe?id=" ++ (String.fromInt id)
         , expect = Http.expectJson GotReceipe receipeDecoder
         }
 
@@ -694,6 +742,24 @@ maybeEncoder f value =
 
         Nothing ->
             JE.null
+
+
+
+-- URL PARSING
+
+
+type Route
+    = OverviewRoute
+    | ReceipeRoute Int
+    | EditReceipeRoute Int
+
+
+routeParser : Url.Parser.Parser (Route -> a) a
+routeParser =
+    Url.Parser.oneOf
+        [ Url.Parser.map ReceipeRoute (Url.Parser.s "receipe" </> Url.Parser.int)
+        , Url.Parser.map EditReceipeRoute (Url.Parser.s "receipe" </> Url.Parser.s "edit" </> Url.Parser.int)
+        ]
 
 
 
