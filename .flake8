@@ -1,0 +1,7 @@
+[flake8]
+# black default
+max-line-length = 88 
+
+# ignore whitespace before colon, ignore whitespace before binary operator
+ignore = E203,W503
+exclude = experiments/,test.py,build/
