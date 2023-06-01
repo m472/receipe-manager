@@ -2,7 +2,6 @@ module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
-import Debug
 import Dict exposing (Dict)
 import FormatNumber exposing (format)
 import FormatNumber.Locales exposing (Decimals(..), usLocale)
@@ -21,6 +20,7 @@ import Url.Parser.Query as Query
 -- MAIN
 
 
+main : Program () Model Msg
 main =
     Browser.application
         { init = init
@@ -117,6 +117,7 @@ type alias ReceipePreview =
 
 type Msg
     = GotReceipe (Result Http.Error Receipe)
+    | GotNewReceipe (Result Http.Error Receipe)
     | GotReceipeList (Result Http.Error (List ReceipePreview))
     | EditReceipe
     | Save
@@ -126,6 +127,7 @@ type Msg
     | Uploaded (Result Http.Error ())
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+    | CreateReceipe
 
 
 type ReceipeMsg
@@ -158,6 +160,14 @@ update msg model =
             case result of
                 Ok receipe ->
                     ( { model | content = ReceipeViewer (ScaledReceipe receipe receipe.servings.amount) "" }, Cmd.none )
+
+                Err _ ->
+                    ( { model | content = Failure }, Cmd.none )
+
+        GotNewReceipe result ->
+            case result of
+                Ok receipe ->
+                    ( { model | content = ReceipeEditor receipe }, Cmd.none )
 
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
@@ -262,6 +272,9 @@ update msg model =
 
                 Browser.External href ->
                     ( model, Nav.load href )
+
+        CreateReceipe ->
+            ({model | content = Loading }, getNewReceipe)
 
 
 updateReceipe : ReceipeMsg -> Receipe -> Receipe
@@ -408,6 +421,7 @@ viewReceipeList : List ReceipePreview -> Html Msg
 viewReceipeList receipeList =
     div []
         [ h1 [] [ text "Rezepte-Übersicht" ]
+        , button [ onClick CreateReceipe ] [ text "neues Rezept"]
         , ul []
             (List.map
                 (\receipe ->
@@ -650,6 +664,13 @@ getReceipe id =
         , expect = Http.expectJson GotReceipe receipeDecoder
         }
 
+getNewReceipe : Cmd Msg
+getNewReceipe =
+    Http.post
+        { url = "/receipe/create"
+        , body = Http.emptyBody
+        , expect = Http.expectJson GotNewReceipe receipeDecoder
+        }
 
 receipeDecoder : JD.Decoder Receipe
 receipeDecoder =

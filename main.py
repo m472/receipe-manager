@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Type, TypeVar
 
@@ -47,7 +47,7 @@ class IngredientGroup:
 @dataclass
 class Servings:
     amount: int
-    unit: str = "Portionen"
+    unit: str
 
 
 @dataclass
@@ -56,7 +56,7 @@ class Receipe:
     title: str
     ingredients: list[IngredientGroup]
     servings: Servings
-    image_ids: list[int] | None = None
+    image_ids: list[int] = field(default_factory=list)
 
     def get_image_ids(self) -> list[int]:
         return [
@@ -78,6 +78,10 @@ class Receipe:
     def load(cls: Type[_T], path: Path) -> _T:
         return from_json(cls, path.read_text())
 
+    def save(self) -> None:
+        COOKBOOK.receipes[self.id] = self
+        (RECEIPE_DIR / f"{self.id}.json").write_text(to_json(self))
+
 
 @dataclass
 class Cookbook:
@@ -92,8 +96,10 @@ class Cookbook:
             if f.is_file() and f.name.endswith(".json")
         ]
         units = [from_dict(Unit, f) for f in json.loads(UNITS_FILE.read_text())]
+
         return Cookbook(
-            receipes={r.id: r for r in receipes}, units={u.id: u for u in units}
+            receipes={r.id: r for r in receipes},
+            units={u.id: u for u in units},
         )
 
 
@@ -107,6 +113,7 @@ def home() -> str:
 
 @app.route("/receipe/list")
 def receipe_list() -> Response:
+    print(COOKBOOK.receipes.items())
     return jsonify(
         [
             {
@@ -133,19 +140,35 @@ def json_receipe_update() -> tuple[Response, int]:
     try:
         id = int(request.args["id"])
         receipe = from_json(Receipe, request.data)
-        COOKBOOK.receipes[id] = receipe
-        (RECEIPE_DIR / f"{id}.json").write_text(to_json(receipe))
+        receipe.save()
+        assert receipe.id == id
+
+    except ValueError:
+        status_code = 400
+        status = "Error parsing url request parameter 'id'"
 
     except SerdeError as se:
         status_code = 400
         status = f"Parsing Error: {se}"
-        print(request.data)
+
+    except AssertionError:
+        status_code = 400
+        status = "Assertion Error"
 
     else:
         status_code = 200
         status = "success"
 
     return (jsonify({"status": status}), status_code)
+
+
+@app.route("/receipe/create", methods=["POST"])
+def json_receipe_create() -> tuple[Response, int]:
+    _id = max(COOKBOOK.receipes) + 1
+    new_receipe = Receipe(_id, "", [], Servings(4, "Portionen"))
+    new_receipe.save()
+
+    return jsonify(asdict(new_receipe) | {"units": COOKBOOK.units}), 200
 
 
 @app.route("/receipe/image")
