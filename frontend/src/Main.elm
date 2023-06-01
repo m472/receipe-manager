@@ -120,6 +120,8 @@ type Msg
     | GotNewReceipe (Result Http.Error Receipe)
     | GotReceipeList (Result Http.Error (List ReceipePreview))
     | EditReceipe
+    | DeleteReceipe
+    | ReceipeDeleted (Result Http.Error String)
     | Save
     | CancelEdit
     | ReceipeServingsChanged String
@@ -276,6 +278,18 @@ update msg model =
         CreateReceipe ->
             ({model | content = Loading }, getNewReceipe)
 
+        DeleteReceipe ->
+            case model.content of
+                ReceipeViewer scaled_receipe _ ->
+                    ({model | content = Loading }, deleteReceipe scaled_receipe.receipe.id)
+                ReceipeEditor receipe ->
+                    ({model | content = Loading }, deleteReceipe receipe.id)
+                _ ->
+                    (model, Cmd.none)
+
+        ReceipeDeleted _ ->
+            ({model | content = Loading }, getReceipeList)
+
 
 updateReceipe : ReceipeMsg -> Receipe -> Receipe
 updateReceipe msg model =
@@ -405,7 +419,7 @@ view model =
                 Loading ->
                     text "loading..."
 
-                ReceipeViewer receipe msg ->
+                ReceipeViewer receipe _ ->
                     viewReceipe receipe
 
                 ReceipeEditor receipe ->
@@ -427,7 +441,10 @@ viewReceipeList receipeList =
                 (\receipe ->
                     li []
                         [ a [ href ("/receipe/" ++ String.fromInt receipe.id) ]
-                            [ text receipe.title ]
+                            [ text (case receipe.title of
+                                        "" -> "Untitled"
+                                        title -> title
+                                ) ]
                         ]
                 )
                 receipeList
@@ -460,7 +477,8 @@ viewReceipe scaled_receipe =
                 ]
             ]
         , div [] (List.map (viewIngredientGroup scaling_factor receipe.units) receipe.ingredients)
-        , button [ onClick EditReceipe ] [ text "edit" ]
+        , button [ onClick EditReceipe ] [ text "bearbeiten" ]
+        , button [ onClick DeleteReceipe ] [ text "löschen" ]
         ]
 
 
@@ -671,6 +689,14 @@ getNewReceipe =
         , body = Http.emptyBody
         , expect = Http.expectJson GotNewReceipe receipeDecoder
         }
+
+deleteReceipe : Int -> Cmd Msg
+deleteReceipe id = 
+    Http.post
+    { url = "/receipe/delete?id=" ++ (String.fromInt id)
+    , body = Http.emptyBody
+    , expect = Http.expectString ReceipeDeleted
+    }
 
 receipeDecoder : JD.Decoder Receipe
 receipeDecoder =

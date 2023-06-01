@@ -171,6 +171,32 @@ def json_receipe_create() -> tuple[Response, int]:
     return jsonify(asdict(new_receipe) | {"units": COOKBOOK.units}), 200
 
 
+@app.route("/receipe/delete", methods=["POST"])
+def json_receipe_delete() -> tuple[str, int]:
+    try:
+        _id = int(request.args["id"])
+
+        # delete all images associated with the receipe
+        for img_id in COOKBOOK.receipes[_id].get_image_ids():
+            (RECEIPE_IMG_DIR / f"{_id}_{img_id}.jpg").unlink()
+
+        # delete receipe
+        (RECEIPE_DIR / f"{_id}.json").unlink()
+
+        # remove from cache
+        del COOKBOOK.receipes[_id]
+
+    except ValueError:
+        status_code = 400
+        status = "Error parsing url request parameter 'id'"
+
+    else:
+        status_code = 200
+        status = "deletion successful"
+
+    return status, status_code
+
+
 @app.route("/receipe/image")
 def get_image() -> Response:
     receipe_id = int(request.args["receipe_id"])
