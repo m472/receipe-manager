@@ -9,10 +9,8 @@
     <body>
         <main>
             <pre id="elm-node"></pre>
-            <script type="text/javascript">Elm.Main.init({ node: document.getElementById("elm-node") })</script>
+            <script type="text/javascript">Elm.Main.init({ node: document.getElementById("elm-node"), flags: "{{ path }}" })</script>
         </main>
-        <footer>
-            Footer
-        </footer>
+        <footer>Footer</footer>
     </body>
 </html>

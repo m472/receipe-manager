@@ -107,8 +107,9 @@ COOKBOOK = Cookbook.load()
 
 
 @app.route("/")
-def home() -> str:
-    return render_template("home.html")
+@app.route("/<path:path>")
+def home(path: str = "") -> str:
+    return render_template("home.html", path=path)
 
 
 @app.route("/receipe/list")
