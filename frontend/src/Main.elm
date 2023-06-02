@@ -157,7 +157,7 @@ type IngredientGroupMsg
     = UpdateGroupName String
     | AddIngredient
     | RemoveIngredient Int
-    | RoutedIngredientMsg Int Int IngredientMsg
+    | RoutedIngredientMsg Int IngredientMsg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -166,7 +166,14 @@ update msg model =
         GotReceipe result ->
             case result of
                 Ok receipe ->
-                    ( { model | content = ReceipeViewer (ScaledReceipe receipe receipe.servings.amount) "" }, Cmd.none )
+                    ( { model
+                        | content =
+                            ReceipeViewer
+                                (ScaledReceipe receipe receipe.servings.amount)
+                                ""
+                      }
+                    , Cmd.none
+                    )
 
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
@@ -190,7 +197,9 @@ update msg model =
         EditReceipe ->
             case model.content of
                 ReceipeViewer scaled_receipe info ->
-                    ( { model | content = ReceipeEditor scaled_receipe.receipe }, Cmd.none )
+                    ( { model | content = ReceipeEditor scaled_receipe.receipe }
+                    , Cmd.none
+                    )
 
                 _ ->
                     ( model, Cmd.none )
@@ -220,7 +229,12 @@ update msg model =
             in
             case ( servingsFactor, model.content ) of
                 ( Just value, ReceipeViewer scaled_receipe info ) ->
-                    ( { model | content = ReceipeViewer { scaled_receipe | servings = value } info }
+                    ( { model
+                        | content =
+                            ReceipeViewer
+                                { scaled_receipe | servings = value }
+                                info
+                      }
                     , Cmd.none
                     )
 
@@ -278,10 +292,18 @@ update msg model =
         DeleteReceipe ->
             case model.content of
                 ReceipeViewer scaled_receipe _ ->
-                    ( { model | content = Loading "DeleteReceipe" }, deleteReceipe scaled_receipe.receipe.id )
+                    ( { model
+                        | content = Loading "DeleteReceipe"
+                      }
+                    , deleteReceipe scaled_receipe.receipe.id
+                    )
 
                 ReceipeEditor receipe ->
-                    ( { model | content = Loading "DeleteReceipe" }, deleteReceipe receipe.id )
+                    ( { model
+                        | content = Loading "DeleteReceipe"
+                      }
+                    , deleteReceipe receipe.id
+                    )
 
                 _ ->
                     ( model, Cmd.none )
@@ -294,16 +316,16 @@ onUrlChange : Url.Url -> ( ModelContent, Cmd Msg )
 onUrlChange url =
     case Url.Parser.parse routeParser url of
         Just (ReceipeRoute id) ->
-            Debug.log ("receiperoute " ++ String.fromInt id) ( Loading ("Receipe " ++ String.fromInt id), getReceipe id )
+            ( Loading ("Receipe " ++ String.fromInt id), getReceipe id )
 
         Just (EditReceipeRoute id) ->
-            Debug.log ("edit_receiperoute " ++ String.fromInt id) ( Loading ("ReceipeEditor" ++ String.fromInt id), getReceipe id )
+            ( Loading ("ReceipeEditor" ++ String.fromInt id), getReceipe id )
 
         Just OverviewRoute ->
-            Debug.log "OverviewRoute" ( Loading "Overview", getReceipeList )
+            ( Loading "Overview", getReceipeList )
 
         Nothing ->
-            Debug.log "Nothing" ( InvalidUrl url, Cmd.none )
+            ( InvalidUrl url, Cmd.none )
 
 
 updateReceipe : ReceipeMsg -> Receipe -> Receipe
@@ -379,12 +401,16 @@ updateIngredientGroup msg model =
             { model | name = newName }
 
         AddIngredient ->
-            { model | ingredients = model.ingredients ++ [ Ingredient Nothing "" "" Nothing ] }
+            { model
+                | ingredients =
+                    model.ingredients
+                        ++ [ Ingredient Nothing "" "" Nothing ]
+            }
 
         RemoveIngredient index ->
             { model | ingredients = removeElementAt index model.ingredients }
 
-        RoutedIngredientMsg groupIndex index submsg ->
+        RoutedIngredientMsg index submsg ->
             let
                 newIngredients =
                     List.indexedMap
@@ -432,7 +458,11 @@ view model =
                     text "that went wrong..."
 
                 InvalidUrl url ->
-                    text ("Error 404: die URL '" ++ (Url.toString url) ++ "' ist ungültig")
+                    text
+                        ("Error 404: die URL '"
+                            ++ Url.toString url
+                            ++ "' ist ungültig"
+                        )
 
                 Loading msg ->
                     text ("loading " ++ msg ++ " ...")
@@ -499,7 +529,11 @@ viewReceipe scaled_receipe =
                 , text (" " ++ receipe.servings.unit ++ ":")
                 ]
             ]
-        , div [] (List.map (viewIngredientGroup scaling_factor receipe.units) receipe.ingredients)
+        , div []
+            (List.map
+                (viewIngredientGroup scaling_factor receipe.units)
+                receipe.ingredients
+            )
         , button [ onClick EditReceipe ] [ text "bearbeiten" ]
         , button [ onClick DeleteReceipe ] [ text "löschen" ]
         ]
@@ -512,7 +546,12 @@ editReceipe receipe =
             Html.map (\msg -> RoutedReceipeMsg msg)
     in
     div []
-        [ routeMsgs (h1 [] [ text "Titel: ", input [ value receipe.title, onInput UpdateTitle ] [] ])
+        [ routeMsgs
+            (h1 []
+                [ text "Titel: "
+                , input [ value receipe.title, onInput UpdateTitle ] []
+                ]
+            )
         , viewImages receipe.id receipe.image_ids
         , p []
             [ routeMsgs
@@ -585,7 +624,8 @@ editIngredientGroup receipe i ingredientGroup =
                 , input [ value ingredientGroup.name, onInput UpdateGroupName ] []
                 ]
             )
-        , Html.map (\msg -> RoutedReceipeMsg msg) (button [ onClick (RemoveIngredientGroup i) ] [ text "entfernen" ])
+        , Html.map (\msg -> RoutedReceipeMsg msg)
+            (button [ onClick (RemoveIngredientGroup i) ] [ text "entfernen" ])
         , ul []
             (List.indexedMap
                 (editIngredient receipe.units i ingredientGroup)
@@ -611,7 +651,12 @@ viewMaybeFloat : Float -> Maybe Float -> String
 viewMaybeFloat factor value =
     case value of
         Just floatValue ->
-            format { usLocale | decimals = Max 1, thousandSeparator = "'" } (factor * floatValue)
+            format
+                { usLocale
+                    | decimals = Max 1
+                    , thousandSeparator = "'"
+                }
+                (factor * floatValue)
 
         Nothing ->
             ""
@@ -630,7 +675,15 @@ viewUnit ingredient_unit_id units =
 editIngredient : Dict String Unit -> Int -> IngredientGroup -> Int -> Ingredient -> Html Msg
 editIngredient units i ingredientGroup j ingredient =
     li []
-        (List.map (Html.map (\msg -> RoutedReceipeMsg (RoutedIngredientGroupMsg i (RoutedIngredientMsg i j msg))))
+        (List.map
+            (Html.map
+                (\msg ->
+                    RoutedReceipeMsg
+                        (RoutedIngredientGroupMsg i
+                            (RoutedIngredientMsg j msg)
+                        )
+                )
+            )
             [ input
                 [ type_ "number"
                 , value (viewMaybeFloat 1 ingredient.amount)
@@ -831,7 +884,11 @@ routeParser : Url.Parser.Parser (Route -> a) a
 routeParser =
     Url.Parser.oneOf
         [ Url.Parser.map ReceipeRoute (Url.Parser.s "receipe" </> Url.Parser.int)
-        , Url.Parser.map EditReceipeRoute (Url.Parser.s "receipe" </> Url.Parser.s "edit" </> Url.Parser.int)
+        , Url.Parser.map EditReceipeRoute
+            (Url.Parser.s "receipe"
+                </> Url.Parser.s "edit"
+                </> Url.Parser.int
+            )
         , Url.Parser.map OverviewRoute Url.Parser.top
         ]
 
