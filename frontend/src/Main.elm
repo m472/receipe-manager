@@ -43,6 +43,7 @@ type Mode
 
 type ModelContent
     = Failure
+    | InvalidUrl Url.Url
     | Loading String
     | ReceipeViewer ScaledReceipe String
     | ReceipeEditor Receipe
@@ -302,7 +303,7 @@ onUrlChange url =
             Debug.log "OverviewRoute" ( Loading "Overview", getReceipeList )
 
         Nothing ->
-            Debug.log "Nothing" ( Failure, Cmd.none )
+            Debug.log "Nothing" ( InvalidUrl url, Cmd.none )
 
 
 updateReceipe : ReceipeMsg -> Receipe -> Receipe
@@ -429,6 +430,9 @@ view model =
             [ case model.content of
                 Failure ->
                     text "that went wrong..."
+
+                InvalidUrl url ->
+                    text ("Error 404: die URL '" ++ (Url.toString url) ++ "' ist ungültig")
 
                 Loading msg ->
                     text ("loading " ++ msg ++ " ...")
