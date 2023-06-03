@@ -114,7 +114,6 @@ def home(path: str = "") -> str:
 
 @app.route("/receipe/list")
 def receipe_list() -> Response:
-    print(COOKBOOK.receipes.items())
     return jsonify(
         [
             {
