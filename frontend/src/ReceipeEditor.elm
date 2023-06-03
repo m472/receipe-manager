@@ -8,7 +8,8 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Receipe
-import ReceipeViewer
+import ReceipeImageViewer
+import Route
 
 
 
@@ -17,7 +18,7 @@ import ReceipeViewer
 
 type alias Model =
     { receipe : Receipe.Receipe
-    , activeImg : Int
+    , currentImage : Int
     }
 
 
@@ -31,6 +32,7 @@ type Msg
     | Uploaded (Result Http.Error ())
     | Save
     | CancelEdit
+    | ImageViewerMsg ReceipeImageViewer.Msg
 
 
 type IngredientMsg
@@ -55,7 +57,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ h1 [] [ text "Titel: ", input [ value model.receipe.title, onInput UpdateTitle ] [] ]
-        , ReceipeViewer.viewImages model.receipe model.activeImg
+        , Html.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe model.currentImage)
         , p []
             [ b []
                 [ text "Zutaten für "
@@ -158,39 +160,43 @@ editUnit ingredient_unit_id units =
 -- UPDATE
 
 
-updateReceipe : Msg -> Receipe.Receipe -> ( Receipe.Receipe, Cmd Msg )
+updateReceipe : Msg -> Model -> ( Model, Cmd Msg )
 updateReceipe msg model =
+    let
+        receipe =
+            model.receipe
+    in
     case msg of
         AddIngredientGroup ->
-            ( { model | ingredients = model.ingredients ++ [ Receipe.IngredientGroup "" [] ] }, Cmd.none )
+            ( { model | receipe = { receipe | ingredients = receipe.ingredients ++ [ Receipe.IngredientGroup "" [] ] } }, Cmd.none )
 
         UpdateTitle newName ->
-            ( { model | title = newName }, Cmd.none )
+            ( { model | receipe = { receipe | title = newName } }, Cmd.none )
 
         UpdateServingsUnit newUnit ->
             let
                 servs =
-                    model.servings
+                    receipe.servings
             in
-            ( { model | servings = { servs | unit = newUnit } }, Cmd.none )
+            ( { model | receipe = { receipe | servings = { servs | unit = newUnit } } }, Cmd.none )
 
         UpdateServingsAmount amountStr ->
             let
                 servs =
-                    model.servings
+                    receipe.servings
 
                 newAmount =
                     String.toInt amountStr
             in
             case newAmount of
                 Just value ->
-                    ( { model | servings = { servs | amount = value } }, Cmd.none )
+                    ( { model | receipe = { receipe | servings = { servs | amount = value } } }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
         RemoveIngredientGroup index ->
-            ( { model | ingredients = Helpers.removeElementAt index model.ingredients }, Cmd.none )
+            ( { model | receipe = { receipe | ingredients = Helpers.removeElementAt index receipe.ingredients } }, Cmd.none )
 
         RoutedIngredientGroupMsg groupIndex childMsg ->
             let
@@ -203,18 +209,26 @@ updateReceipe msg model =
                             else
                                 ig
                         )
-                        model.ingredients
+                        receipe.ingredients
             in
-            ( { model | ingredients = groups }, Cmd.none )
+            ( { model | receipe = { receipe | ingredients = groups } }, Cmd.none )
 
         Uploaded _ ->
-            ( model, Nav.load ("/receipe/" ++ String.fromInt model.id) )
+            ( model, Route.load (Route.ViewReceipe receipe.id) )
 
         CancelEdit ->
-            ( model, Nav.load ("/receipe/" ++ String.fromInt model.id) )
+            ( model, Route.load (Route.ViewReceipe receipe.id) )
 
         Save ->
-            ( model, sendReceipe model )
+            ( model, sendReceipe receipe )
+
+        ImageViewerMsg subMsg ->
+            ( { model
+                | currentImage =
+                    ReceipeImageViewer.update subMsg receipe model.currentImage
+              }
+            , Cmd.none
+            )
 
 
 updateIngredient : IngredientMsg -> Receipe.Ingredient -> Receipe.Ingredient

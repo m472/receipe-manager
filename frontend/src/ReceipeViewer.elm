@@ -7,8 +7,8 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Receipe exposing (..)
+import ReceipeImageViewer exposing (viewImages)
 import Route
-import Url.Builder
 
 
 
@@ -20,14 +20,13 @@ type Msg
     | Edit
     | ServingsChanged String
     | Deleted (Result Http.Error String)
-    | NextImage
-    | PrevImage
+    | ImageViewerMsg ReceipeImageViewer.Msg
 
 
 type alias Model =
     { receipe : Receipe.Receipe
     , servings : Int
-    , activeImage : Int
+    , currentImage : Int
     , errorMsg : String
     }
 
@@ -57,7 +56,7 @@ view model =
     div []
         [ a [ href "/" ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
-        , viewImages receipe model.activeImage
+        , Html.map ImageViewerMsg (viewImages model.receipe model.currentImage)
         , p []
             [ b []
                 [ text "Zutaten für "
@@ -106,33 +105,6 @@ viewUnit ingredient_unit_id units =
             "??"
 
 
-viewImages : Receipe -> Int -> Html a
-viewImages receipe active_img_nr =
-    div []
-        (List.indexedMap
-            (\i img_id ->
-                img
-                    [ src
-                        (Url.Builder.absolute [ "receipe", "image" ]
-                            [ Url.Builder.int "receipe_id" receipe.id
-                            , Url.Builder.int "image_id" img_id
-                            ]
-                        )
-                    , width 500
-                    , class
-                        (if i == active_img_nr then
-                            "active_img"
-
-                         else
-                            "inactive_img"
-                        )
-                    ]
-                    []
-            )
-            receipe.image_ids
-        )
-
-
 
 -- UPDATE
 
@@ -162,24 +134,15 @@ update msg model =
                 Err _ ->
                     ( model, Route.load Route.Overview )
 
-        NextImage ->
+        ImageViewerMsg childMsg ->
             ( { model
-                | activeImage =
-                    modBy (model.activeImage + 1) (List.length model.receipe.image_ids)
+                | currentImage =
+                    ReceipeImageViewer.update childMsg
+                        model.receipe
+                        model.currentImage
               }
             , Cmd.none
             )
-
-        PrevImage ->
-            let
-                i =
-                    if model.activeImage > 1 then
-                        model.activeImage - 1
-
-                    else
-                        List.length model.receipe.image_ids - 1
-            in
-            ( { model | activeImage = i }, Cmd.none )
 
 
 

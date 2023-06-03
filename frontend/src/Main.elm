@@ -44,7 +44,7 @@ type ModelContent
     = Failure
     | Loading String
     | ReceipeViewer ReceipeViewer.Model
-    | ReceipeEditor Receipe.Receipe
+    | ReceipeEditor ReceipeEditor.Model
     | ViewReceipeList (List ReceipePreview)
 
 
@@ -80,7 +80,7 @@ type Msg
     | GotReceipeForEdit (Result Http.Error Receipe.Receipe)
     | GotNewReceipe (Result Http.Error Receipe.Receipe)
     | GotReceipeList (Result Http.Error (List ReceipePreview))
-    | RoutedEditMsg Receipe.Receipe ReceipeEditor.Msg
+    | RoutedEditMsg ReceipeEditor.Model ReceipeEditor.Msg
     | RoutedReceipeMsg ReceipeViewer.Model ReceipeViewer.Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
@@ -105,7 +105,7 @@ update msg model =
         GotReceipeForEdit result ->
             case result of
                 Ok receipe ->
-                    ( { model | content = ReceipeEditor receipe }, Cmd.none )
+                    ( { model | content = ReceipeEditor { currentImage = 0, receipe = receipe } }, Cmd.none )
 
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
@@ -113,7 +113,7 @@ update msg model =
         GotNewReceipe result ->
             case result of
                 Ok receipe ->
-                    ( { model | content = ReceipeEditor receipe }, Cmd.none )
+                    ( { model | content = ReceipeViewer (ReceipeViewer.modelFromReceipe receipe "") }, Cmd.none )
 
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
@@ -126,15 +126,15 @@ update msg model =
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
 
-        RoutedEditMsg receipe childMsg ->
+        RoutedEditMsg subModel childMsg ->
             let
                 ( updatedContent, cmd ) =
-                    ReceipeEditor.updateReceipe childMsg receipe
+                    ReceipeEditor.updateReceipe childMsg subModel
             in
             ( { model
                 | content = ReceipeEditor updatedContent
               }
-            , Cmd.map (RoutedEditMsg receipe) cmd
+            , Cmd.map (RoutedEditMsg subModel) cmd
             )
 
         RoutedReceipeMsg scaled_receipe childMsg ->
@@ -212,11 +212,7 @@ view model =
 
                 ReceipeEditor receipeEditorModel ->
                     Html.map (RoutedEditMsg receipeEditorModel)
-                        (ReceipeEditor.view
-                            { activeImg = 0
-                            , receipe = receipeEditorModel
-                            }
-                        )
+                        (ReceipeEditor.view receipeEditorModel)
 
                 ViewReceipeList receipeList ->
                     viewReceipeList receipeList
