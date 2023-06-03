@@ -7,12 +7,11 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode as JD
+import Receipe exposing (ScaledReceipe)
+import ReceipeEditor
 import Url
 import Url.Parser exposing ((</>), (<?>))
 
-import Receipe
-import ReceipeEditor
-import Receipe exposing (ScaledReceipe)
 
 
 -- MAIN
@@ -30,7 +29,9 @@ main =
         }
 
 
+
 -- MODEL
+
 
 type Mode
     = Display
@@ -122,7 +123,6 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-
         CancelEdit ->
             case model.content of
                 ReceipeEditor receipe ->
@@ -149,16 +149,19 @@ update msg model =
 
         RoutedEditMsg receipe childMsg ->
             let
-                (updatedContent, cmd) = ReceipeEditor.updateReceipe childMsg receipe
-            in 
-            ( { model | content = ReceipeEditor updatedContent } , Cmd.map (RoutedEditMsg receipe) cmd)
+                ( updatedContent, cmd ) =
+                    ReceipeEditor.updateReceipe childMsg receipe
+            in
+            ( { model | content = ReceipeEditor updatedContent }, Cmd.map (RoutedEditMsg receipe) cmd )
 
         RoutedReceipeMsg scaled_receipe childMsg ->
             let
-                (updatedReceipe, cmd) = Receipe.update childMsg scaled_receipe
+                ( updatedReceipe, cmd ) =
+                    Receipe.update childMsg scaled_receipe
             in
-                ({ model | content = (ReceipeViewer updatedReceipe "")}
-                , Cmd.map (RoutedReceipeMsg updatedReceipe) cmd)
+            ( { model | content = ReceipeViewer updatedReceipe "" }
+            , Cmd.map (RoutedReceipeMsg updatedReceipe) cmd
+            )
 
         UrlChanged url ->
             let
@@ -203,6 +206,7 @@ onUrlChange url =
 
         Nothing ->
             ( Failure, Cmd.none )
+
 
 
 -- SUBSCRIPTIONS
@@ -267,6 +271,7 @@ viewReceipeList receipeList =
         ]
 
 
+
 -- HTTP
 
 
@@ -305,6 +310,7 @@ getNewReceipe =
         }
 
 
+
 -- URL PARSING
 
 
@@ -321,4 +327,3 @@ routeParser =
         , Url.Parser.map EditReceipeRoute (Url.Parser.s "receipe" </> Url.Parser.s "edit" </> Url.Parser.int)
         , Url.Parser.map OverviewRoute Url.Parser.top
         ]
-

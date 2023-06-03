@@ -1,16 +1,19 @@
 module ReceipeEditor exposing (..)
 
+import Dict exposing (Dict)
+import Helpers
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
-import Dict exposing (Dict)
+import Receipe
 import Task
 
-import Receipe
-import Helpers
+
 
 -- MODEL
+
+
 type Msg
     = AddIngredientGroup
     | RemoveIngredientGroup Int
@@ -36,7 +39,11 @@ type IngredientGroupMsg
     | RemoveIngredient Int
     | RoutedIngredientMsg Int Int IngredientMsg
 
+
+
 -- VIEW
+
+
 editReceipe : Receipe.Receipe -> Html Msg
 editReceipe receipe =
     div []
@@ -46,17 +53,17 @@ editReceipe receipe =
             [ b []
                 [ text "Zutaten für "
                 , input
-                [ type_ "number"
-                , value (String.fromInt receipe.servings.amount)
-                , onInput UpdateServingsAmount
-                ]
-                []
+                    [ type_ "number"
+                    , value (String.fromInt receipe.servings.amount)
+                    , onInput UpdateServingsAmount
+                    ]
+                    []
                 , text " "
                 , input
-                [ value receipe.servings.unit
-                , onInput UpdateServingsUnit
-                ]
-                []
+                    [ value receipe.servings.unit
+                    , onInput UpdateServingsUnit
+                    ]
+                    []
                 , text ":"
                 ]
             ]
@@ -66,6 +73,7 @@ editReceipe receipe =
         , button [ onClick Save ] [ text "Speichern" ]
         , button [ onClick CancelEdit ] [ text "Abbrechen" ]
         ]
+
 
 editIngredientGroup : Receipe.Receipe -> Int -> Receipe.IngredientGroup -> Html Msg
 editIngredientGroup receipe i ingredientGroup =
@@ -88,7 +96,6 @@ editIngredientGroup receipe i ingredientGroup =
             )
         , mapMessages (button [ onClick AddIngredient ] [ text "Zutat hinzufügen" ])
         ]
-
 
 
 editIngredient : Dict String Receipe.Unit -> Int -> Int -> Receipe.Ingredient -> Html Msg
@@ -142,21 +149,23 @@ editUnit ingredient_unit_id units =
 
 
 -- UPDATE
-updateReceipe : Msg -> Receipe.Receipe -> ( Receipe.Receipe, Cmd Msg)
+
+
+updateReceipe : Msg -> Receipe.Receipe -> ( Receipe.Receipe, Cmd Msg )
 updateReceipe msg model =
     case msg of
         AddIngredientGroup ->
-            ({ model | ingredients = model.ingredients ++ [ Receipe.IngredientGroup "" [] ] }, Cmd.none)
+            ( { model | ingredients = model.ingredients ++ [ Receipe.IngredientGroup "" [] ] }, Cmd.none )
 
         UpdateTitle newName ->
-            ({ model | title = newName }, Cmd.none)
+            ( { model | title = newName }, Cmd.none )
 
         UpdateServingsUnit newUnit ->
             let
                 servs =
                     model.servings
             in
-            ({ model | servings = { servs | unit = newUnit } }, Cmd.none)
+            ( { model | servings = { servs | unit = newUnit } }, Cmd.none )
 
         UpdateServingsAmount amountStr ->
             let
@@ -168,13 +177,13 @@ updateReceipe msg model =
             in
             case newAmount of
                 Just value ->
-                    ({ model | servings = { servs | amount = value } }, Cmd.none)
+                    ( { model | servings = { servs | amount = value } }, Cmd.none )
 
                 _ ->
-                    (model, Cmd.none)
+                    ( model, Cmd.none )
 
         RemoveIngredientGroup index ->
-            ({ model | ingredients = Helpers.removeElementAt index model.ingredients }, Cmd.none)
+            ( { model | ingredients = Helpers.removeElementAt index model.ingredients }, Cmd.none )
 
         RoutedIngredientGroupMsg groupIndex childMsg ->
             let
@@ -189,16 +198,16 @@ updateReceipe msg model =
                         )
                         model.ingredients
             in
-            ({ model | ingredients = groups }, Cmd.none)
+            ( { model | ingredients = groups }, Cmd.none )
 
         Uploaded _ ->
-            (model, Cmd.none)
+            ( model, Cmd.none )
 
         CancelEdit ->
-            (model, Cmd.none)
+            ( model, Cmd.none )
 
         Save ->
-            (model, sendReceipe model)
+            ( model, sendReceipe model )
 
 
 updateIngredient : IngredientMsg -> Receipe.Ingredient -> Receipe.Ingredient
@@ -252,5 +261,3 @@ sendReceipe receipe =
         , body = Http.jsonBody (Receipe.receipeEncoder receipe)
         , expect = Http.expectWhatever Uploaded
         }
-
-

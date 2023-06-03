@@ -1,14 +1,15 @@
 module Receipe exposing (..)
 
 import Dict exposing (Dict)
+import Helpers
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http
 import Json.Decode as JD
 import Json.Encode as JE
-import Http
 
-import Helpers
+
 
 -- MODEL
 
@@ -62,13 +63,19 @@ type alias Unit =
     , si_conversion_factor : Float
     }
 
+
+
 -- INIT
+
 
 toScaled : Receipe -> ScaledReceipe
 toScaled receipe =
     ScaledReceipe receipe receipe.servings.amount
 
+
+
 -- VIEW
+
 
 viewReceipe : ScaledReceipe -> Html Msg
 viewReceipe scaled_receipe =
@@ -88,7 +95,8 @@ viewReceipe scaled_receipe =
                 , input
                     [ type_ "number"
                     , value (String.fromInt scaled_receipe.servings)
-                    , onInput ServingsChanged ]
+                    , onInput ServingsChanged
+                    ]
                     []
                 , text (" " ++ receipe.servings.unit ++ ":")
                 ]
@@ -97,6 +105,7 @@ viewReceipe scaled_receipe =
         , button [ onClick Edit ] [ text "bearbeiten" ]
         , button [ onClick Delete ] [ text "löschen" ]
         ]
+
 
 viewIngredientGroup : Float -> Dict String Unit -> IngredientGroup -> Html a
 viewIngredientGroup factor units ingredientGroup =
@@ -127,6 +136,7 @@ viewUnit ingredient_unit_id units =
         Nothing ->
             "??"
 
+
 viewImages : Int -> List Int -> Html a
 viewImages receipe_id image_ids =
     div []
@@ -147,30 +157,35 @@ viewImages receipe_id image_ids =
         )
 
 
+
 -- UPDATE
 
-update : Msg -> ScaledReceipe ->  ( ScaledReceipe, Cmd Msg )
+
+update : Msg -> ScaledReceipe -> ( ScaledReceipe, Cmd Msg )
 update msg model =
     case msg of
         Edit ->
-            (model, Cmd.none)
+            ( model, Cmd.none )
 
         ServingsChanged servingsStr ->
             case String.toInt servingsStr of
                 Just value ->
-                    ({model | servings = value}, Cmd.none)
+                    ( { model | servings = value }, Cmd.none )
 
                 Nothing ->
                     ( model, Cmd.none )
 
         Delete ->
-            ( model, Cmd.none)
+            ( model, Cmd.none )
 
         Deleted _ ->
             --( { model | content = Loading "Receipe Deleted" }, getReceipeList )
-            ( model, Cmd.none)
+            ( model, Cmd.none )
+
+
 
 -- ENCODERS
+
 
 receipeEncoder : Receipe -> JE.Value
 receipeEncoder receipe =
@@ -218,7 +233,10 @@ maybeEncoder f value =
         Nothing ->
             JE.null
 
+
+
 -- DECODERS
+
 
 receipeDecoder : JD.Decoder Receipe
 receipeDecoder =
@@ -261,7 +279,10 @@ unitDecoder =
         (JD.field "symbol" JD.string)
         (JD.field "si_conversion_factor" JD.float)
 
+
+
 -- HTTP
+
 
 deleteReceipe : Int -> Cmd Msg
 deleteReceipe id =
