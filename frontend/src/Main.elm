@@ -15,7 +15,6 @@ import Url.Parser exposing ((</>), (<?>))
 
 
 
-
 -- MAIN
 
 
@@ -105,7 +104,7 @@ update msg model =
         GotReceipeForEdit result ->
             case result of
                 Ok receipe ->
-                    ( { model | content = ReceipeEditor receipe }, Cmd.none)
+                    ( { model | content = ReceipeEditor receipe }, Cmd.none )
 
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
@@ -163,6 +162,7 @@ update msg model =
 
         CreateReceipe ->
             ( { model | content = Loading "new Receipe" }, getNewReceipe )
+
 
 onUrlChange : Url.Url -> ( ModelContent, Cmd Msg )
 onUrlChange url =

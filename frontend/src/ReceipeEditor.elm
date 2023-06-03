@@ -8,7 +8,6 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Receipe
-
 import Task
 
 

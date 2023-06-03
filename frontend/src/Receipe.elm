@@ -1,7 +1,6 @@
-module Receipe exposing (Ingredient, IngredientGroup, Msg, Receipe, Model, Unit, decoder, encoder, modelFromReceipe, update, view, viewImages)
+module Receipe exposing (Ingredient, IngredientGroup, Model, Msg, Receipe, Unit, decoder, encoder, modelFromReceipe, update, view, viewImages)
 
 import Browser.Navigation as Nav
-
 import Dict exposing (Dict)
 import Helpers
 import Html exposing (..)
@@ -91,7 +90,7 @@ view scaled_receipe =
             toFloat scaled_receipe.servings / toFloat receipe.servings.amount
     in
     div []
-        [ a [href "/"] [text "Alle Rezepte"]
+        [ a [ href "/" ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
         , viewImages receipe.id receipe.image_ids
         , p []
@@ -181,15 +180,15 @@ update msg model =
                     ( model, Cmd.none )
 
         Delete ->
-            Debug.log "delete" ( model, deleteReceipe model.receipe.id )
+            ( model, deleteReceipe model.receipe.id )
 
         Deleted result ->
             case result of
                 Ok _ ->
                     ( model, Route.load Route.Overview )
+
                 Err _ ->
                     ( model, Route.load Route.Overview )
-
 
 
 

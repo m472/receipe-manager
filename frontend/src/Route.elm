@@ -4,6 +4,8 @@ import Browser.Navigation as Nav
 import Url
 import Url.Parser exposing ((</>), (<?>))
 
+
+
 -- URL PARSING
 
 
@@ -22,16 +24,21 @@ parse =
         , Url.Parser.map Overview Url.Parser.top
         ]
 
+
+
 -- URL BUILDING
+
+
 load : Route -> Cmd a
 load route =
-    Nav.load (
-    case route of
-        Overview ->
-            "/"
-        ViewReceipe id ->
-            "/receipe/" ++ String.fromInt id
+    Nav.load
+        (case route of
+            Overview ->
+                "/"
 
-        EditReceipe id ->
-            "/receipe/" ++ String.fromInt id
-    )
+            ViewReceipe id ->
+                "/receipe/" ++ String.fromInt id
+
+            EditReceipe id ->
+                "/receipe/edit/" ++ String.fromInt id
+        )
