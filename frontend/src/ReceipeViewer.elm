@@ -20,11 +20,14 @@ type Msg
     | Edit
     | ServingsChanged String
     | Deleted (Result Http.Error String)
+    | NextImage
+    | PrevImage
 
 
 type alias Model =
     { receipe : Receipe.Receipe
     , servings : Int
+    , activeImage : Int
     , errorMsg : String
     }
 
@@ -35,7 +38,7 @@ type alias Model =
 
 modelFromReceipe : Receipe -> String -> Model
 modelFromReceipe receipe msg =
-    Model receipe receipe.servings.amount msg
+    Model receipe receipe.servings.amount 0 msg
 
 
 
@@ -43,24 +46,24 @@ modelFromReceipe receipe msg =
 
 
 view : Model -> Html Msg
-view scaled_receipe =
+view model =
     let
         receipe =
-            scaled_receipe.receipe
+            model.receipe
 
         scaling_factor =
-            toFloat scaled_receipe.servings / toFloat receipe.servings.amount
+            toFloat model.servings / toFloat receipe.servings.amount
     in
     div []
         [ a [ href "/" ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
-        , viewImages receipe
+        , viewImages receipe model.activeImage
         , p []
             [ b []
                 [ text "Zutaten für "
                 , input
                     [ type_ "number"
-                    , value (String.fromInt scaled_receipe.servings)
+                    , value (String.fromInt model.servings)
                     , onInput ServingsChanged
                     ]
                     []
@@ -103,11 +106,11 @@ viewUnit ingredient_unit_id units =
             "??"
 
 
-viewImages : Receipe -> Html a
-viewImages receipe =
+viewImages : Receipe -> Int -> Html a
+viewImages receipe active_img_nr =
     div []
-        (List.map
-            (\img_id ->
+        (List.indexedMap
+            (\i img_id ->
                 img
                     [ src
                         (Url.Builder.absolute [ "receipe", "image" ]
@@ -116,6 +119,13 @@ viewImages receipe =
                             ]
                         )
                     , width 500
+                    , class
+                        (if i == active_img_nr then
+                            "active_img"
+
+                         else
+                            "inactive_img"
+                        )
                     ]
                     []
             )
@@ -151,6 +161,25 @@ update msg model =
 
                 Err _ ->
                     ( model, Route.load Route.Overview )
+
+        NextImage ->
+            ( { model
+                | activeImage =
+                    modBy (model.activeImage + 1) (List.length model.receipe.image_ids)
+              }
+            , Cmd.none
+            )
+
+        PrevImage ->
+            let
+                i =
+                    if model.activeImage > 1 then
+                        model.activeImage - 1
+
+                    else
+                        List.length model.receipe.image_ids - 1
+            in
+            ( { model | activeImage = i }, Cmd.none )
 
 
 

@@ -15,6 +15,12 @@ import ReceipeViewer
 -- MODEL
 
 
+type alias Model =
+    { receipe : Receipe.Receipe
+    , activeImg : Int
+    }
+
+
 type Msg
     = AddIngredientGroup
     | RemoveIngredientGroup Int
@@ -45,30 +51,30 @@ type IngredientGroupMsg
 -- VIEW
 
 
-editReceipe : Receipe.Receipe -> Html Msg
-editReceipe receipe =
+view : Model -> Html Msg
+view model =
     div []
-        [ h1 [] [ text "Titel: ", input [ value receipe.title, onInput UpdateTitle ] [] ]
-        , ReceipeViewer.viewImages receipe
+        [ h1 [] [ text "Titel: ", input [ value model.receipe.title, onInput UpdateTitle ] [] ]
+        , ReceipeViewer.viewImages model.receipe model.activeImg
         , p []
             [ b []
                 [ text "Zutaten für "
                 , input
                     [ type_ "number"
-                    , value (String.fromInt receipe.servings.amount)
+                    , value (String.fromInt model.receipe.servings.amount)
                     , onInput UpdateServingsAmount
                     ]
                     []
                 , text " "
                 , input
-                    [ value receipe.servings.unit
+                    [ value model.receipe.servings.unit
                     , onInput UpdateServingsUnit
                     ]
                     []
                 , text ":"
                 ]
             ]
-        , div [] (List.indexedMap (editIngredientGroup receipe) receipe.ingredients)
+        , div [] (List.indexedMap (editIngredientGroup model.receipe) model.receipe.ingredients)
         , button [ onClick AddIngredientGroup ]
             [ text "Zutatengruppe hinzufügen" ]
         , button [ onClick Save ] [ text "Speichern" ]

@@ -206,11 +206,17 @@ view model =
                 Loading msg ->
                     text ("loading " ++ msg ++ " ...")
 
-                ReceipeViewer receipe ->
-                    Html.map (RoutedReceipeMsg receipe) (ReceipeViewer.view receipe)
+                ReceipeViewer receipeViewerModel ->
+                    Html.map (RoutedReceipeMsg receipeViewerModel)
+                        (ReceipeViewer.view receipeViewerModel)
 
-                ReceipeEditor receipe ->
-                    Html.map (RoutedEditMsg receipe) (ReceipeEditor.editReceipe receipe)
+                ReceipeEditor receipeEditorModel ->
+                    Html.map (RoutedEditMsg receipeEditorModel)
+                        (ReceipeEditor.view
+                            { activeImg = 0
+                            , receipe = receipeEditorModel
+                            }
+                        )
 
                 ViewReceipeList receipeList ->
                     viewReceipeList receipeList
