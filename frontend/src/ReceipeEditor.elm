@@ -8,7 +8,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Receipe
-import Task
+import ReceipeViewer
 
 
 
@@ -49,7 +49,7 @@ editReceipe : Receipe.Receipe -> Html Msg
 editReceipe receipe =
     div []
         [ h1 [] [ text "Titel: ", input [ value receipe.title, onInput UpdateTitle ] [] ]
-        , Receipe.viewImages receipe.id receipe.image_ids
+        , ReceipeViewer.viewImages receipe
         , p []
             [ b []
                 [ text "Zutaten für "

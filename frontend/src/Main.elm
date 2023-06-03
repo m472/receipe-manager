@@ -9,6 +9,7 @@ import Http
 import Json.Decode as JD
 import Receipe
 import ReceipeEditor
+import ReceipeViewer
 import Route
 import Url
 import Url.Parser exposing ((</>), (<?>))
@@ -42,7 +43,7 @@ type Mode
 type ModelContent
     = Failure
     | Loading String
-    | ReceipeViewer Receipe.Model
+    | ReceipeViewer ReceipeViewer.Model
     | ReceipeEditor Receipe.Receipe
     | ViewReceipeList (List ReceipePreview)
 
@@ -80,7 +81,7 @@ type Msg
     | GotNewReceipe (Result Http.Error Receipe.Receipe)
     | GotReceipeList (Result Http.Error (List ReceipePreview))
     | RoutedEditMsg Receipe.Receipe ReceipeEditor.Msg
-    | RoutedReceipeMsg Receipe.Model Receipe.Msg
+    | RoutedReceipeMsg ReceipeViewer.Model ReceipeViewer.Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | CreateReceipe
@@ -93,7 +94,7 @@ update msg model =
             case result of
                 Ok receipe ->
                     ( { model
-                        | content = ReceipeViewer (Receipe.modelFromReceipe receipe "")
+                        | content = ReceipeViewer (ReceipeViewer.modelFromReceipe receipe "")
                       }
                     , Cmd.none
                     )
@@ -139,7 +140,7 @@ update msg model =
         RoutedReceipeMsg scaled_receipe childMsg ->
             let
                 ( updatedReceipe, cmd ) =
-                    Receipe.update childMsg scaled_receipe
+                    ReceipeViewer.update childMsg scaled_receipe
             in
             ( { model | content = ReceipeViewer updatedReceipe }
             , Cmd.map (RoutedReceipeMsg updatedReceipe) cmd
@@ -206,7 +207,7 @@ view model =
                     text ("loading " ++ msg ++ " ...")
 
                 ReceipeViewer receipe ->
-                    Html.map (RoutedReceipeMsg receipe) (Receipe.view receipe)
+                    Html.map (RoutedReceipeMsg receipe) (ReceipeViewer.view receipe)
 
                 ReceipeEditor receipe ->
                     Html.map (RoutedEditMsg receipe) (ReceipeEditor.editReceipe receipe)
