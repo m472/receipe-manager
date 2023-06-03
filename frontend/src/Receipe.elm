@@ -1,4 +1,6 @@
-module Receipe exposing (..)
+module Receipe exposing (Ingredient, IngredientGroup, Msg, Receipe, Model, Unit, decoder, encoder, modelFromReceipe, update, view, viewImages)
+
+import Browser.Navigation as Nav
 
 import Dict exposing (Dict)
 import Helpers
@@ -8,6 +10,7 @@ import Html.Events exposing (..)
 import Http
 import Json.Decode as JD
 import Json.Encode as JE
+import Route
 
 
 
@@ -21,9 +24,10 @@ type Msg
     | Deleted (Result Http.Error String)
 
 
-type alias ScaledReceipe =
+type alias Model =
     { receipe : Receipe
     , servings : Int
+    , errorMsg : String
     }
 
 
@@ -68,17 +72,17 @@ type alias Unit =
 -- INIT
 
 
-toScaled : Receipe -> ScaledReceipe
-toScaled receipe =
-    ScaledReceipe receipe receipe.servings.amount
+modelFromReceipe : Receipe -> String -> Model
+modelFromReceipe receipe msg =
+    Model receipe receipe.servings.amount msg
 
 
 
 -- VIEW
 
 
-viewReceipe : ScaledReceipe -> Html Msg
-viewReceipe scaled_receipe =
+view : Model -> Html Msg
+view scaled_receipe =
     let
         receipe =
             scaled_receipe.receipe
@@ -87,7 +91,8 @@ viewReceipe scaled_receipe =
             toFloat scaled_receipe.servings / toFloat receipe.servings.amount
     in
     div []
-        [ h1 [] [ text receipe.title ]
+        [ a [href "/"] [text "Alle Rezepte"]
+        , h1 [] [ text receipe.title ]
         , viewImages receipe.id receipe.image_ids
         , p []
             [ b []
@@ -161,11 +166,11 @@ viewImages receipe_id image_ids =
 -- UPDATE
 
 
-update : Msg -> ScaledReceipe -> ( ScaledReceipe, Cmd Msg )
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Edit ->
-            ( model, Cmd.none )
+            ( model, Route.load (Route.EditReceipe model.receipe.id) )
 
         ServingsChanged servingsStr ->
             case String.toInt servingsStr of
@@ -176,19 +181,23 @@ update msg model =
                     ( model, Cmd.none )
 
         Delete ->
-            ( model, Cmd.none )
+            Debug.log "delete" ( model, deleteReceipe model.receipe.id )
 
-        Deleted _ ->
-            --( { model | content = Loading "Receipe Deleted" }, getReceipeList )
-            ( model, Cmd.none )
+        Deleted result ->
+            case result of
+                Ok _ ->
+                    ( model, Route.load Route.Overview )
+                Err _ ->
+                    ( model, Route.load Route.Overview )
+
 
 
 
 -- ENCODERS
 
 
-receipeEncoder : Receipe -> JE.Value
-receipeEncoder receipe =
+encoder : Receipe -> JE.Value
+encoder receipe =
     JE.object
         [ ( "title", JE.string receipe.title )
         , ( "id", JE.int receipe.id )
@@ -238,8 +247,8 @@ maybeEncoder f value =
 -- DECODERS
 
 
-receipeDecoder : JD.Decoder Receipe
-receipeDecoder =
+decoder : JD.Decoder Receipe
+decoder =
     JD.map6 Receipe
         (JD.field "id" JD.int)
         (JD.field "title" JD.string)

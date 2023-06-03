@@ -7,10 +7,12 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode as JD
-import Receipe exposing (ScaledReceipe)
+import Receipe
 import ReceipeEditor
+import Route
 import Url
 import Url.Parser exposing ((</>), (<?>))
+
 
 
 
@@ -41,7 +43,7 @@ type Mode
 type ModelContent
     = Failure
     | Loading String
-    | ReceipeViewer ScaledReceipe String
+    | ReceipeViewer Receipe.Model
     | ReceipeEditor Receipe.Receipe
     | ViewReceipeList (List ReceipePreview)
 
@@ -75,14 +77,11 @@ type alias ReceipePreview =
 
 type Msg
     = GotReceipe (Result Http.Error Receipe.Receipe)
+    | GotReceipeForEdit (Result Http.Error Receipe.Receipe)
     | GotNewReceipe (Result Http.Error Receipe.Receipe)
     | GotReceipeList (Result Http.Error (List ReceipePreview))
-    | EditReceipe
-    | DeleteReceipe
-    | CancelEdit
-    | ReceipeServingsChanged String
     | RoutedEditMsg Receipe.Receipe ReceipeEditor.Msg
-    | RoutedReceipeMsg ScaledReceipe Receipe.Msg
+    | RoutedReceipeMsg Receipe.Model Receipe.Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | CreateReceipe
@@ -94,7 +93,19 @@ update msg model =
         GotReceipe result ->
             case result of
                 Ok receipe ->
-                    ( { model | content = ReceipeViewer (Receipe.toScaled receipe) "" }, Cmd.none )
+                    ( { model
+                        | content = ReceipeViewer (Receipe.modelFromReceipe receipe "")
+                      }
+                    , Cmd.none
+                    )
+
+                Err _ ->
+                    ( { model | content = Failure }, Cmd.none )
+
+        GotReceipeForEdit result ->
+            case result of
+                Ok receipe ->
+                    ( { model | content = ReceipeEditor receipe }, Cmd.none)
 
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
@@ -115,51 +126,23 @@ update msg model =
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
 
-        EditReceipe ->
-            case model.content of
-                ReceipeViewer scaled_receipe info ->
-                    ( { model | content = ReceipeEditor scaled_receipe.receipe }, Cmd.none )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        CancelEdit ->
-            case model.content of
-                ReceipeEditor receipe ->
-                    ( { model | content = Loading "ReceipeEditor" }
-                    , getReceipe receipe.id
-                    )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        ReceipeServingsChanged servingsStr ->
-            let
-                servingsFactor =
-                    String.toInt servingsStr
-            in
-            case ( servingsFactor, model.content ) of
-                ( Just value, ReceipeViewer scaled_receipe info ) ->
-                    ( { model | content = ReceipeViewer { scaled_receipe | servings = value } info }
-                    , Cmd.none
-                    )
-
-                ( _, _ ) ->
-                    ( model, Cmd.none )
-
         RoutedEditMsg receipe childMsg ->
             let
                 ( updatedContent, cmd ) =
                     ReceipeEditor.updateReceipe childMsg receipe
             in
-            ( { model | content = ReceipeEditor updatedContent }, Cmd.map (RoutedEditMsg receipe) cmd )
+            ( { model
+                | content = ReceipeEditor updatedContent
+              }
+            , Cmd.map (RoutedEditMsg receipe) cmd
+            )
 
         RoutedReceipeMsg scaled_receipe childMsg ->
             let
                 ( updatedReceipe, cmd ) =
                     Receipe.update childMsg scaled_receipe
             in
-            ( { model | content = ReceipeViewer updatedReceipe "" }
+            ( { model | content = ReceipeViewer updatedReceipe }
             , Cmd.map (RoutedReceipeMsg updatedReceipe) cmd
             )
 
@@ -181,27 +164,16 @@ update msg model =
         CreateReceipe ->
             ( { model | content = Loading "new Receipe" }, getNewReceipe )
 
-        DeleteReceipe ->
-            Debug.todo "DeleteReceipe"
-
-
-updateWith : (subModel -> Model) -> (subMsg -> Msg) -> Model -> ( subModel, Cmd subMsg ) -> ( Model, Cmd Msg )
-updateWith toModel toMsg _ ( subModel, subCmd ) =
-    ( toModel subModel
-    , Cmd.map toMsg subCmd
-    )
-
-
 onUrlChange : Url.Url -> ( ModelContent, Cmd Msg )
 onUrlChange url =
-    case Url.Parser.parse routeParser url of
-        Just (ReceipeRoute id) ->
-            ( Loading ("Receipe " ++ String.fromInt id), getReceipe id )
+    case Url.Parser.parse Route.parse url of
+        Just (Route.ViewReceipe id) ->
+            ( Loading ("Receipe " ++ String.fromInt id), getReceipe GotReceipe id )
 
-        Just (EditReceipeRoute id) ->
-            ( Loading ("ReceipeEditor" ++ String.fromInt id), getReceipe id )
+        Just (Route.EditReceipe id) ->
+            ( Loading ("ReceipeEditor" ++ String.fromInt id), getReceipe GotReceipeForEdit id )
 
-        Just OverviewRoute ->
+        Just Route.Overview ->
             ( Loading "Overview", getReceipeList )
 
         Nothing ->
@@ -213,7 +185,7 @@ onUrlChange url =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions _ =
     Sub.none
 
 
@@ -233,8 +205,8 @@ view model =
                 Loading msg ->
                     text ("loading " ++ msg ++ " ...")
 
-                ReceipeViewer receipe _ ->
-                    Html.map (RoutedReceipeMsg receipe) (Receipe.viewReceipe receipe)
+                ReceipeViewer receipe ->
+                    Html.map (RoutedReceipeMsg receipe) (Receipe.view receipe)
 
                 ReceipeEditor receipe ->
                     Html.map (RoutedEditMsg receipe) (ReceipeEditor.editReceipe receipe)
@@ -293,11 +265,11 @@ receipeListDecoder =
         )
 
 
-getReceipe : Int -> Cmd Msg
-getReceipe id =
+getReceipe : (Result Http.Error Receipe.Receipe -> Msg) -> Int -> Cmd Msg
+getReceipe msg id =
     Http.get
         { url = "/receipe?id=" ++ String.fromInt id
-        , expect = Http.expectJson GotReceipe Receipe.receipeDecoder
+        , expect = Http.expectJson msg Receipe.decoder
         }
 
 
@@ -306,24 +278,5 @@ getNewReceipe =
     Http.post
         { url = "/receipe/create"
         , body = Http.emptyBody
-        , expect = Http.expectJson GotNewReceipe Receipe.receipeDecoder
+        , expect = Http.expectJson GotNewReceipe Receipe.decoder
         }
-
-
-
--- URL PARSING
-
-
-type Route
-    = OverviewRoute
-    | ReceipeRoute Int
-    | EditReceipeRoute Int
-
-
-routeParser : Url.Parser.Parser (Route -> a) a
-routeParser =
-    Url.Parser.oneOf
-        [ Url.Parser.map ReceipeRoute (Url.Parser.s "receipe" </> Url.Parser.int)
-        , Url.Parser.map EditReceipeRoute (Url.Parser.s "receipe" </> Url.Parser.s "edit" </> Url.Parser.int)
-        , Url.Parser.map OverviewRoute Url.Parser.top
-        ]

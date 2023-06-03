@@ -1,5 +1,6 @@
 module ReceipeEditor exposing (..)
 
+import Browser.Navigation as Nav
 import Dict exposing (Dict)
 import Helpers
 import Html exposing (..)
@@ -7,6 +8,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Receipe
+
 import Task
 
 
@@ -37,7 +39,7 @@ type IngredientGroupMsg
     = UpdateGroupName String
     | AddIngredient
     | RemoveIngredient Int
-    | RoutedIngredientMsg Int Int IngredientMsg
+    | RoutedIngredientMsg Int IngredientMsg
 
 
 
@@ -101,7 +103,7 @@ editIngredientGroup receipe i ingredientGroup =
 editIngredient : Dict String Receipe.Unit -> Int -> Int -> Receipe.Ingredient -> Html Msg
 editIngredient units i j ingredient =
     li []
-        (List.map (Html.map (\msg -> RoutedIngredientGroupMsg i (RoutedIngredientMsg i j msg)))
+        (List.map (Html.map (\msg -> RoutedIngredientGroupMsg i (RoutedIngredientMsg j msg)))
             [ input
                 [ type_ "number"
                 , value (Helpers.viewMaybeFloat 1 ingredient.amount)
@@ -201,10 +203,10 @@ updateReceipe msg model =
             ( { model | ingredients = groups }, Cmd.none )
 
         Uploaded _ ->
-            ( model, Cmd.none )
+            ( model, Nav.load ("/receipe/" ++ String.fromInt model.id) )
 
         CancelEdit ->
-            ( model, Cmd.none )
+            ( model, Nav.load ("/receipe/" ++ String.fromInt model.id) )
 
         Save ->
             ( model, sendReceipe model )
@@ -238,7 +240,7 @@ updateIngredientGroup msg model =
         RemoveIngredient index ->
             { model | ingredients = Helpers.removeElementAt index model.ingredients }
 
-        RoutedIngredientMsg groupIndex index submsg ->
+        RoutedIngredientMsg index submsg ->
             let
                 newIngredients =
                     List.indexedMap
@@ -258,6 +260,6 @@ sendReceipe : Receipe.Receipe -> Cmd Msg
 sendReceipe receipe =
     Http.post
         { url = "/receipe/update?id=" ++ String.fromInt receipe.id
-        , body = Http.jsonBody (Receipe.receipeEncoder receipe)
+        , body = Http.jsonBody (Receipe.encoder receipe)
         , expect = Http.expectWhatever Uploaded
         }
