@@ -1,4 +1,4 @@
-module Receipe exposing (Ingredient, IngredientGroup, Receipe, Unit, decoder, encoder)
+module Receipe exposing (Ingredient, IngredientGroup, InstructionGroup, Receipe, Unit, decoder, encoder)
 
 import Dict exposing (Dict)
 import Html exposing (..)
@@ -14,6 +14,7 @@ type alias Receipe =
     , image_ids : List Int
     , servings : Servings
     , ingredients : List IngredientGroup
+    , instructions : List InstructionGroup
     , units : Dict String Unit
     }
 
@@ -45,6 +46,12 @@ type alias Unit =
     }
 
 
+type alias InstructionGroup =
+    { name : String
+    , steps : List String
+    }
+
+
 
 -- ENCODERS
 
@@ -56,6 +63,7 @@ encoder receipe =
         , ( "id", JE.int receipe.id )
         , ( "ingredients", JE.list ingredientGroupEncoder receipe.ingredients )
         , ( "image_ids", JE.list JE.int receipe.image_ids )
+        , ( "instructions", JE.list instructionGroupEncoder receipe.instructions )
         , ( "servings", servingsEncoder receipe.servings )
         ]
 
@@ -75,6 +83,14 @@ ingredientEncoder ingredient =
         , ( "unit", JE.string ingredient.unit )
         , ( "name", JE.string ingredient.name )
         , ( "comment", maybeEncoder JE.string ingredient.comment )
+        ]
+
+
+instructionGroupEncoder : InstructionGroup -> JE.Value
+instructionGroupEncoder instructionGroup =
+    JE.object
+        [ ( "name", JE.string instructionGroup.name )
+        , ( "steps", JE.list JE.string instructionGroup.steps )
         ]
 
 
@@ -102,12 +118,13 @@ maybeEncoder f value =
 
 decoder : JD.Decoder Receipe
 decoder =
-    JD.map6 Receipe
+    JD.map7 Receipe
         (JD.field "id" JD.int)
         (JD.field "title" JD.string)
         (JD.field "image_ids" (JD.list JD.int))
         (JD.field "servings" servingsDecoder)
         (JD.field "ingredients" (JD.list ingredientGroupDecoder))
+        (JD.field "instructions" (JD.list instructionGroupDecoder))
         (JD.field "units" (JD.dict unitDecoder))
 
 
@@ -132,6 +149,13 @@ ingredientDecoder =
         (JD.field "unit" JD.string)
         (JD.field "name" JD.string)
         (JD.field "comment" (JD.nullable JD.string))
+
+
+instructionGroupDecoder : JD.Decoder InstructionGroup
+instructionGroupDecoder =
+    JD.map2 InstructionGroup
+        (JD.field "name" JD.string)
+        (JD.field "steps" (JD.list JD.string))
 
 
 unitDecoder : JD.Decoder Unit

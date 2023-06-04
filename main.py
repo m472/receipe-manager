@@ -45,6 +45,12 @@ class IngredientGroup:
 
 
 @dataclass
+class InstructionGroup:
+    name: str
+    steps: list[str]
+
+
+@dataclass
 class Servings:
     amount: int
     unit: str
@@ -55,6 +61,7 @@ class Receipe:
     id: int
     title: str
     ingredients: list[IngredientGroup]
+    instructions: list[InstructionGroup]
     servings: Servings
     image_ids: list[int] = field(default_factory=list)
 
@@ -203,11 +210,18 @@ def get_image() -> Response:
     image_id = int(request.args["image_id"])
     return send_from_directory(RECEIPE_IMG_DIR, f"{receipe_id}_{image_id}.jpg")
 
-@app.route("/receipe/image/new", methods=["PUT"])
+@app.route("/receipe/image/upload", methods=["PUT"])
 def upload_image() -> Response:
     receipe_id = int(request.args["receipe_id"])
     image_id = int(request.args["image_id"])
     (RECEIPE_IMG_DIR / f"{receipe_id}_{image_id}.jpg").write_bytes(request.data)
+    return jsonify({"status": "success"})
+
+@app.route("/receipe/image/delete", methods=["POST"])
+def delete_image() -> Response:
+    receipe_id = int(request.args["receipe_id"])
+    image_id = int(request.args["image_id"])
+    (RECEIPE_IMG_DIR / f"{receipe_id}_{image_id}.jpg").unlink()
     return jsonify({"status": "success"})
 
 

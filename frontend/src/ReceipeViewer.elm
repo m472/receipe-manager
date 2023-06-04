@@ -57,6 +57,7 @@ view model =
         [ a [ href "/" ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
         , Html.map ImageViewerMsg (viewImages model.receipe model.currentImage)
+        , h2 [] [text "Zutaten"]
         , p []
             [ b []
                 [ text "Zutaten für "
@@ -70,6 +71,8 @@ view model =
                 ]
             ]
         , div [] (List.map (viewIngredientGroup scaling_factor receipe.units) receipe.ingredients)
+        , h2 [] [text "Zubereitung"]
+        , div [] (List.map viewInstructionGroup receipe.instructions)
         , button [ onClick Edit ] [ text "bearbeiten" ]
         , button [ onClick Delete ] [ text "löschen" ]
         ]
@@ -104,6 +107,12 @@ viewUnit ingredient_unit_id units =
         Nothing ->
             "??"
 
+viewInstructionGroup : InstructionGroup -> Html a
+viewInstructionGroup group =
+    div []
+    [ b [] [ text group.name ]
+    , ul [] (List.map (\step -> li [] [text step]) group.steps)
+    ]
 
 
 -- UPDATE

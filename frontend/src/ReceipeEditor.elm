@@ -9,10 +9,9 @@ import Html.Events exposing (..)
 import Http
 import Json.Decode as JD
 import Platform.Cmd as Cmd
-import Receipe
+import Receipe exposing (InstructionGroup)
 import ReceipeImageViewer
 import Route
-import Tuple exposing (second)
 import Url.Builder
 
 
@@ -34,19 +33,30 @@ type Msg
     | UpdateServingsAmount String
     | UpdateServingsUnit String
     | RoutedIngredientGroupMsg Int IngredientGroupMsg
-    | Uploaded (Result Http.Error ())
+    | RoutedInstructionMsg Int InstructionGroupMsg
+    | ReceipeUploaded (Result Http.Error ())
     | ImageUploaded (Result Http.Error ())
     | Save
     | CancelEdit
     | ImageViewerMsg ReceipeImageViewer.Msg
     | GotImages (List File)
+    | DeleteImage
+    | ImageDeleted (Result Http.Error ())
+    | RemoveInstructionGroup Int
 
 
 type IngredientMsg
-    = UpdateName String
+    = UpdateIngredientName String
     | UpdateUnit String
     | UpdateComment String
     | UpdateAmount String
+
+
+type InstructionGroupMsg
+    = UpdateInstructionGroupName String
+    | UpdateStep Int String
+    | AddStep
+    | RemoveStep Int
 
 
 type IngredientGroupMsg
@@ -65,7 +75,10 @@ view model =
     div []
         [ h1 [] [ text "Titel: ", input [ value model.receipe.title, onInput UpdateTitle ] [] ]
         , Html.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe model.currentImage)
-        , input [ on "change" (JD.map GotImages filesDecoder), type_ "file", multiple True ] [ text "Bild auswählen" ]
+        , input [ on "change" (JD.map GotImages filesDecoder), type_ "file", multiple True ]
+            [ text "Bild auswählen" ]
+        , button [ onClick DeleteImage ] [ text "Bild löschen" ]
+        , h2 [] [ text "Zutaten" ]
         , p []
             [ b []
                 [ text "Zutaten für "
@@ -84,16 +97,22 @@ view model =
                 , text ":"
                 ]
             ]
-        , div [] (List.indexedMap (editIngredientGroup model.receipe) model.receipe.ingredients)
+        , div [] (List.indexedMap (viewIngredientGroup model.receipe) model.receipe.ingredients)
         , button [ onClick AddIngredientGroup ]
             [ text "Zutatengruppe hinzufügen" ]
+        , h2 [] [ text "Zubereitung" ]
+        , div []
+            (List.indexedMap
+                (\i ig -> viewInstructionGroup i ig)
+                model.receipe.instructions
+            )
         , button [ onClick Save ] [ text "Speichern" ]
         , button [ onClick CancelEdit ] [ text "Abbrechen" ]
         ]
 
 
-editIngredientGroup : Receipe.Receipe -> Int -> Receipe.IngredientGroup -> Html Msg
-editIngredientGroup receipe i ingredientGroup =
+viewIngredientGroup : Receipe.Receipe -> Int -> Receipe.IngredientGroup -> Html Msg
+viewIngredientGroup receipe i ingredientGroup =
     let
         mapMessages =
             Html.map (RoutedIngredientGroupMsg i)
@@ -108,15 +127,15 @@ editIngredientGroup receipe i ingredientGroup =
         , button [ onClick (RemoveIngredientGroup i) ] [ text "entfernen" ]
         , ul []
             (List.indexedMap
-                (editIngredient receipe.units i)
+                (viewIngredient receipe.units i)
                 ingredientGroup.ingredients
             )
         , mapMessages (button [ onClick AddIngredient ] [ text "Zutat hinzufügen" ])
         ]
 
 
-editIngredient : Dict String Receipe.Unit -> Int -> Int -> Receipe.Ingredient -> Html Msg
-editIngredient units i j ingredient =
+viewIngredient : Dict String Receipe.Unit -> Int -> Int -> Receipe.Ingredient -> Html Msg
+viewIngredient units i j ingredient =
     li []
         (List.map (Html.map (\msg -> RoutedIngredientGroupMsg i (RoutedIngredientMsg j msg)))
             [ input
@@ -125,12 +144,12 @@ editIngredient units i j ingredient =
                 , onInput UpdateAmount
                 ]
                 []
-            , editUnit ingredient.unit units
+            , viewUnit ingredient.unit units
             , text " "
             , input
                 [ type_ "text"
                 , value ingredient.name
-                , onInput UpdateName
+                , onInput UpdateIngredientName
                 ]
                 []
             , input
@@ -146,8 +165,8 @@ editIngredient units i j ingredient =
         )
 
 
-editUnit : String -> Dict.Dict String Receipe.Unit -> Html IngredientMsg
-editUnit ingredient_unit_id units =
+viewUnit : String -> Dict.Dict String Receipe.Unit -> Html IngredientMsg
+viewUnit ingredient_unit_id units =
     let
         selected =
             Dict.get ingredient_unit_id units
@@ -162,6 +181,40 @@ editUnit ingredient_unit_id units =
     in
     select [ onInput UpdateUnit ]
         (List.map (\unit -> option [ value unit.id ] [ text unit.symbol ]) sortedUnits)
+
+
+viewInstructionGroup : Int -> InstructionGroup -> Html Msg
+viewInstructionGroup i instructionGroup =
+    div []
+        (b []
+            [ text "Zubereitungsschritte für "
+            , Html.map (RoutedInstructionMsg i)
+                (input
+                    [ type_ "text"
+                    , onInput UpdateInstructionGroupName
+                    , value instructionGroup.name
+                    ]
+                    []
+                )
+            , text ":"
+            ]
+            :: List.indexedMap
+                (\j s -> Html.map (RoutedInstructionMsg i) (viewInstructionStep j s))
+                instructionGroup.steps
+            ++ [ Html.map (RoutedInstructionMsg i) (button [ onClick AddStep ] [ text "Schritt hinzufügen" ])
+               , button [ onClick (RemoveInstructionGroup i) ]
+                    [ text "Zubereitungsgruppe entfernen" ]
+               ]
+        )
+
+
+viewInstructionStep : Int -> String -> Html InstructionGroupMsg
+viewInstructionStep index step =
+    div []
+        [ text (String.fromInt (index + 1) ++ ". ")
+        , textarea [ onInput (UpdateStep index) ] [ text step ]
+        , button [ onClick (RemoveStep index) ] [ text "-" ]
+        ]
 
 
 
@@ -198,30 +251,54 @@ updateReceipe msg model =
             in
             case newAmount of
                 Just value ->
-                    ( { model | receipe = { receipe | servings = { servs | amount = value } } }, Cmd.none )
+                    ( { model
+                        | receipe =
+                            { receipe
+                                | servings = { servs | amount = value }
+                            }
+                      }
+                    , Cmd.none
+                    )
 
-                _ ->
+                Nothing ->
                     ( model, Cmd.none )
 
         RemoveIngredientGroup index ->
-            ( { model | receipe = { receipe | ingredients = Helpers.removeElementAt index receipe.ingredients } }, Cmd.none )
+            ( { model
+                | receipe =
+                    { receipe
+                        | ingredients = Helpers.removeElementAt index receipe.ingredients
+                    }
+              }
+            , Cmd.none
+            )
 
         RoutedIngredientGroupMsg groupIndex childMsg ->
             let
                 groups =
-                    List.indexedMap
-                        (\i ig ->
-                            if i == groupIndex then
-                                updateIngredientGroup childMsg ig
-
-                            else
-                                ig
-                        )
+                    Helpers.updateElementAt groupIndex
+                        (updateIngredientGroup childMsg)
                         receipe.ingredients
             in
             ( { model | receipe = { receipe | ingredients = groups } }, Cmd.none )
 
-        Uploaded _ ->
+        RoutedInstructionMsg groupIndex childMsg ->
+            let
+                groups =
+                    Helpers.updateElementAt groupIndex
+                        (updateInstructionGroup childMsg)
+                        receipe.instructions
+            in
+            ( { model
+                | receipe =
+                    { receipe
+                        | instructions = groups
+                    }
+              }
+            , Cmd.none
+            )
+
+        ReceipeUploaded _ ->
             ( model, Route.load (Route.ViewReceipe receipe.id) )
 
         CancelEdit ->
@@ -261,11 +338,42 @@ updateReceipe msg model =
                 Err _ ->
                     ( { model | errorMessage = "shit..." }, Cmd.none )
 
+        DeleteImage ->
+            ( { model
+                | receipe =
+                    { receipe
+                        | image_ids =
+                            List.filter
+                                ((/=) model.currentImage)
+                                model.receipe.image_ids
+                    }
+              }
+            , deleteImage receipe model.currentImage
+            )
+
+        ImageDeleted result ->
+            case result of
+                Ok _ ->
+                    ( model, Cmd.none )
+
+                Err _ ->
+                    ( { model | errorMessage = "Fehler beim Löschen des Bildes" }, Cmd.none )
+
+        RemoveInstructionGroup i ->
+            ( { model
+                | receipe =
+                    { receipe
+                        | ingredients = Helpers.removeElementAt i model.receipe.ingredients
+                    }
+              }
+            , Cmd.none
+            )
+
 
 updateIngredient : IngredientMsg -> Receipe.Ingredient -> Receipe.Ingredient
 updateIngredient msg model =
     case msg of
-        UpdateName newName ->
+        UpdateIngredientName newName ->
             { model | name = newName }
 
         UpdateUnit newUnitId ->
@@ -278,14 +386,21 @@ updateIngredient msg model =
             { model | amount = String.toFloat amountStr }
 
 
-updateIngredientGroup : IngredientGroupMsg -> Receipe.IngredientGroup -> Receipe.IngredientGroup
+updateIngredientGroup :
+    IngredientGroupMsg
+    -> Receipe.IngredientGroup
+    -> Receipe.IngredientGroup
 updateIngredientGroup msg model =
     case msg of
         UpdateGroupName newName ->
             { model | name = newName }
 
         AddIngredient ->
-            { model | ingredients = model.ingredients ++ [ Receipe.Ingredient Nothing "" "" Nothing ] }
+            { model
+                | ingredients =
+                    model.ingredients
+                        ++ [ Receipe.Ingredient Nothing "" "" Nothing ]
+            }
 
         RemoveIngredient index ->
             { model | ingredients = Helpers.removeElementAt index model.ingredients }
@@ -306,12 +421,33 @@ updateIngredientGroup msg model =
             { model | ingredients = newIngredients }
 
 
+updateInstructionGroup :
+    InstructionGroupMsg
+    -> Receipe.InstructionGroup
+    -> Receipe.InstructionGroup
+updateInstructionGroup msg model =
+    case msg of
+        UpdateStep index value ->
+            { model | steps = Helpers.updateElementAt index (\_ -> value) model.steps }
+
+        AddStep ->
+            { model | steps = model.steps ++ [ "" ] }
+
+        RemoveStep index ->
+            { model | steps = Helpers.removeElementAt index model.steps }
+
+        UpdateInstructionGroupName name ->
+            { model | name = name }
+
+
 sendReceipe : Receipe.Receipe -> Cmd Msg
 sendReceipe receipe =
     Http.post
-        { url = Url.Builder.absolute [ "receipe", "update" ] [ Url.Builder.int "id" receipe.id ]
+        { url =
+            Url.Builder.absolute [ "receipe", "update" ]
+                [ Url.Builder.int "id" receipe.id ]
         , body = Http.jsonBody (Receipe.encoder receipe)
-        , expect = Http.expectWhatever Uploaded
+        , expect = Http.expectWhatever ReceipeUploaded
         }
 
 
@@ -326,7 +462,7 @@ uploadImage file receipe =
         { method = "PUT"
         , headers = []
         , url =
-            Url.Builder.absolute [ "receipe", "image", "new" ]
+            Url.Builder.absolute [ "receipe", "image", "upload" ]
                 [ Url.Builder.int "receipe_id" receipe.id
                 , Url.Builder.int "image_id" newImgId
                 ]
@@ -336,6 +472,19 @@ uploadImage file receipe =
         , tracker = Nothing
         }
     )
+
+
+deleteImage : Receipe.Receipe -> Int -> Cmd Msg
+deleteImage receipe imgId =
+    Http.post
+        { url =
+            Url.Builder.absolute [ "receipe", "image", "delete" ]
+                [ Url.Builder.int "receipe_id" receipe.id
+                , Url.Builder.int "image_id" imgId
+                ]
+        , body = Http.emptyBody
+        , expect = Http.expectWhatever ImageDeleted
+        }
 
 
 
