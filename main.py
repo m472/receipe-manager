@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -147,8 +148,15 @@ def json_receipe_update() -> tuple[Response, int]:
     try:
         id = int(request.args["id"])
         receipe = from_json(Receipe, request.data)
-        receipe.save()
         assert receipe.id == id
+
+        # delete unreferenced images
+        for img_path in RECEIPE_IMG_DIR.iterdir():
+            m = re.match(f"{receipe.id}_(\\d+)", img_path.stem)
+            if m and int(m.group(1)) not in receipe.image_ids:
+                img_path.unlink()
+
+        receipe.save()
 
     except ValueError:
         status_code = 400
@@ -172,7 +180,14 @@ def json_receipe_update() -> tuple[Response, int]:
 @app.route("/receipe/create", methods=["POST"])
 def json_receipe_create() -> tuple[Response, int]:
     _id = max(COOKBOOK.receipes) + 1
-    new_receipe = Receipe(_id, "", [], Servings(4, "Portionen"))
+    new_receipe = Receipe(
+        id=_id,
+        title="",
+        ingredients=[],
+        servings=Servings(4, "Portionen"),
+        instructions=[],
+    )
+
     new_receipe.save()
 
     return jsonify(asdict(new_receipe) | {"units": COOKBOOK.units}), 200
@@ -210,18 +225,12 @@ def get_image() -> Response:
     image_id = int(request.args["image_id"])
     return send_from_directory(RECEIPE_IMG_DIR, f"{receipe_id}_{image_id}.jpg")
 
+
 @app.route("/receipe/image/upload", methods=["PUT"])
 def upload_image() -> Response:
     receipe_id = int(request.args["receipe_id"])
     image_id = int(request.args["image_id"])
     (RECEIPE_IMG_DIR / f"{receipe_id}_{image_id}.jpg").write_bytes(request.data)
-    return jsonify({"status": "success"})
-
-@app.route("/receipe/image/delete", methods=["POST"])
-def delete_image() -> Response:
-    receipe_id = int(request.args["receipe_id"])
-    image_id = int(request.args["image_id"])
-    (RECEIPE_IMG_DIR / f"{receipe_id}_{image_id}.jpg").unlink()
     return jsonify({"status": "success"})
 
 

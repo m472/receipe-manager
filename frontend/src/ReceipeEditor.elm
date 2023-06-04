@@ -41,7 +41,6 @@ type Msg
     | ImageViewerMsg ReceipeImageViewer.Msg
     | GotImages (List File)
     | DeleteImage
-    | ImageDeleted (Result Http.Error ())
     | RemoveInstructionGroup Int
 
 
@@ -339,25 +338,30 @@ updateReceipe msg model =
                     ( { model | errorMessage = "shit..." }, Cmd.none )
 
         DeleteImage ->
-            ( { model
-                | receipe =
-                    { receipe
-                        | image_ids =
-                            List.filter
-                                ((/=) model.currentImage)
-                                model.receipe.image_ids
-                    }
-              }
-            , deleteImage receipe model.currentImage
+            let
+                updatedImageIds =
+                    Helpers.removeElementAt
+                        model.currentImage
+                        model.receipe.image_ids
+
+                wasUpdated =
+                    List.length updatedImageIds
+                        /= List.length model.receipe.image_ids
+            in
+            ( Debug.log ("delete image " ++ String.fromInt model.currentImage)
+                { model
+                    | receipe = { receipe | image_ids = updatedImageIds }
+                    , currentImage =
+                        model.currentImage
+                            - (if wasUpdated then
+                                1
+
+                               else
+                                0
+                              )
+                }
+            , Cmd.none
             )
-
-        ImageDeleted result ->
-            case result of
-                Ok _ ->
-                    ( model, Cmd.none )
-
-                Err _ ->
-                    ( { model | errorMessage = "Fehler beim Löschen des Bildes" }, Cmd.none )
 
         RemoveInstructionGroup i ->
             ( { model
@@ -472,19 +476,6 @@ uploadImage file receipe =
         , tracker = Nothing
         }
     )
-
-
-deleteImage : Receipe.Receipe -> Int -> Cmd Msg
-deleteImage receipe imgId =
-    Http.post
-        { url =
-            Url.Builder.absolute [ "receipe", "image", "delete" ]
-                [ Url.Builder.int "receipe_id" receipe.id
-                , Url.Builder.int "image_id" imgId
-                ]
-        , body = Http.emptyBody
-        , expect = Http.expectWhatever ImageDeleted
-        }
 
 
 

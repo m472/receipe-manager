@@ -19,7 +19,6 @@ updateElementAt index updateFunc =
             else
                 elem
         )
-        
 
 
 viewMaybeFloat : Float -> Maybe Float -> String
