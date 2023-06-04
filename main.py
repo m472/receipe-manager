@@ -203,6 +203,13 @@ def get_image() -> Response:
     image_id = int(request.args["image_id"])
     return send_from_directory(RECEIPE_IMG_DIR, f"{receipe_id}_{image_id}.jpg")
 
+@app.route("/receipe/image/new", methods=["PUT"])
+def upload_image() -> Response:
+    receipe_id = int(request.args["receipe_id"])
+    image_id = int(request.args["image_id"])
+    (RECEIPE_IMG_DIR / f"{receipe_id}_{image_id}.jpg").write_bytes(request.data)
+    return jsonify({"status": "success"})
+
 
 if __name__ == "__main__":
     app.run()

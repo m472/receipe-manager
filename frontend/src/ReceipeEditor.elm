@@ -1,15 +1,19 @@
 module ReceipeEditor exposing (..)
 
-import Browser.Navigation as Nav
 import Dict exposing (Dict)
+import File exposing (File)
 import Helpers
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
+import Json.Decode as JD
+import Platform.Cmd as Cmd
 import Receipe
 import ReceipeImageViewer
 import Route
+import Tuple exposing (second)
+import Url.Builder
 
 
 
@@ -19,6 +23,7 @@ import Route
 type alias Model =
     { receipe : Receipe.Receipe
     , currentImage : Int
+    , errorMessage : String
     }
 
 
@@ -30,9 +35,11 @@ type Msg
     | UpdateServingsUnit String
     | RoutedIngredientGroupMsg Int IngredientGroupMsg
     | Uploaded (Result Http.Error ())
+    | ImageUploaded (Result Http.Error ())
     | Save
     | CancelEdit
     | ImageViewerMsg ReceipeImageViewer.Msg
+    | GotImages (List File)
 
 
 type IngredientMsg
@@ -58,6 +65,7 @@ view model =
     div []
         [ h1 [] [ text "Titel: ", input [ value model.receipe.title, onInput UpdateTitle ] [] ]
         , Html.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe model.currentImage)
+        , input [ on "change" (JD.map GotImages filesDecoder), type_ "file", multiple True ] [ text "Bild auswählen" ]
         , p []
             [ b []
                 [ text "Zutaten für "
@@ -230,6 +238,29 @@ updateReceipe msg model =
             , Cmd.none
             )
 
+        GotImages images ->
+            case images of
+                [] ->
+                    ( model, Cmd.none )
+
+                head :: tail ->
+                    let
+                        ( r, firstCmd ) =
+                            uploadImage head model.receipe
+
+                        ( updatedModel, secondCmd ) =
+                            updateReceipe (GotImages tail) { model | receipe = r }
+                    in
+                    ( updatedModel, Cmd.batch [ firstCmd, secondCmd ] )
+
+        ImageUploaded result ->
+            case result of
+                Ok _ ->
+                    ( model, Cmd.none )
+
+                Err _ ->
+                    ( { model | errorMessage = "shit..." }, Cmd.none )
+
 
 updateIngredient : IngredientMsg -> Receipe.Ingredient -> Receipe.Ingredient
 updateIngredient msg model =
@@ -278,7 +309,39 @@ updateIngredientGroup msg model =
 sendReceipe : Receipe.Receipe -> Cmd Msg
 sendReceipe receipe =
     Http.post
-        { url = "/receipe/update?id=" ++ String.fromInt receipe.id
+        { url = Url.Builder.absolute [ "receipe", "update" ] [ Url.Builder.int "id" receipe.id ]
         , body = Http.jsonBody (Receipe.encoder receipe)
         , expect = Http.expectWhatever Uploaded
         }
+
+
+uploadImage : File -> Receipe.Receipe -> ( Receipe.Receipe, Cmd Msg )
+uploadImage file receipe =
+    let
+        newImgId =
+            List.length receipe.image_ids
+    in
+    ( { receipe | image_ids = newImgId :: receipe.image_ids }
+    , Http.request
+        { method = "PUT"
+        , headers = []
+        , url =
+            Url.Builder.absolute [ "receipe", "image", "new" ]
+                [ Url.Builder.int "receipe_id" receipe.id
+                , Url.Builder.int "image_id" newImgId
+                ]
+        , body = Http.fileBody file
+        , expect = Http.expectWhatever ImageUploaded
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+    )
+
+
+
+-- DECODER
+
+
+filesDecoder : JD.Decoder (List File)
+filesDecoder =
+    JD.at [ "target", "files" ] (JD.list File.decoder)
