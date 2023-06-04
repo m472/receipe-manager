@@ -13,6 +13,8 @@ import ReceipeViewer
 import Route
 import Url
 import Url.Parser exposing ((</>), (<?>))
+import Url.Builder as UB
+import Api
 
 
 
@@ -229,7 +231,7 @@ viewReceipeList receipeList =
             (List.map
                 (\receipe ->
                     li []
-                        [ a [ href ("/receipe/" ++ String.fromInt receipe.id) ]
+                        [ a [ href (Route.ViewReceipe receipe.id |> Route.toString) ]
                             [ text
                                 (case receipe.title of
                                     "" ->
@@ -253,7 +255,7 @@ viewReceipeList receipeList =
 getReceipeList : Cmd Msg
 getReceipeList =
     Http.get
-        { url = "/receipe/list"
+        { url = Api.ReceipeList |> Api.toString
         , expect = Http.expectJson GotReceipeList receipeListDecoder
         }
 
@@ -271,7 +273,7 @@ receipeListDecoder =
 getReceipe : (Result Http.Error Receipe.Receipe -> Msg) -> Int -> Cmd Msg
 getReceipe msg id =
     Http.get
-        { url = "/receipe?id=" ++ String.fromInt id
+        { url = Api.Receipe id |> Api.toString
         , expect = Http.expectJson msg Receipe.decoder
         }
 
@@ -279,7 +281,7 @@ getReceipe msg id =
 getNewReceipe : Cmd Msg
 getNewReceipe =
     Http.post
-        { url = "/receipe/create"
+        { url = UB.absolute ["receipe", "create"] []
         , body = Http.emptyBody
         , expect = Http.expectJson GotNewReceipe Receipe.decoder
         }

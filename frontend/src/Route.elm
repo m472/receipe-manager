@@ -1,7 +1,6 @@
 module Route exposing (..)
 
 import Browser.Navigation as Nav
-import Url
 import Url.Parser exposing ((</>), (<?>))
 
 
@@ -31,8 +30,11 @@ parse =
 
 load : Route -> Cmd a
 load route =
-    Nav.load
-        (case route of
+    Nav.load (toString route)
+
+toString : Route -> String
+toString route =
+    case route of
             Overview ->
                 "/"
 
@@ -41,4 +43,3 @@ load route =
 
             EditReceipe id ->
                 "/receipe/edit/" ++ String.fromInt id
-        )

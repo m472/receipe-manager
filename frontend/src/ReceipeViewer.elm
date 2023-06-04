@@ -8,7 +8,7 @@ import Html.Events exposing (..)
 import Http
 import Receipe exposing (..)
 import ReceipeImageViewer exposing (viewImages)
-import Route
+import Route 
 
 
 
@@ -54,7 +54,7 @@ view model =
             toFloat model.servings / toFloat receipe.servings.amount
     in
     div []
-        [ a [ href "/" ] [ text "Alle Rezepte" ]
+        [ a [ href (Route.Overview |> Route.toString) ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
         , Html.map ImageViewerMsg (viewImages model.receipe model.currentImage)
         , h2 [] [ text "Zutaten" ]
