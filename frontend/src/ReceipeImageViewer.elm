@@ -1,5 +1,6 @@
 module ReceipeImageViewer exposing (..)
 
+import Api
 import Array
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -24,12 +25,7 @@ viewImages receipe currentImage =
             div []
                 [ button [ onClick PrevImage ] [ text "<" ]
                 , img
-                    [ src
-                        (Url.Builder.absolute [ "receipe", "image" ]
-                            [ Url.Builder.int "receipe_id" receipe.id
-                            , Url.Builder.int "image_id" value
-                            ]
-                        )
+                    [ src (Api.ReceipeImage receipe currentImage |> Api.toString)
                     , width 500
                     ]
                     []

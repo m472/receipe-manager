@@ -1,20 +1,22 @@
 module Main exposing (..)
 
+import Api
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
+import Importer
 import Json.Decode as JD
+import Platform.Cmd as Cmd
 import Receipe
 import ReceipeEditor
 import ReceipeViewer
-import Route
+import Route exposing (Route(..))
 import Url
-import Url.Parser exposing ((</>), (<?>))
 import Url.Builder as UB
-import Api
+import Url.Parser exposing ((</>), (<?>))
 
 
 
@@ -43,11 +45,12 @@ type Mode
 
 
 type ModelContent
-    = Failure
+    = Failure String
     | Loading String
     | ReceipeViewer ReceipeViewer.Model
     | ReceipeEditor ReceipeEditor.Model
     | ViewReceipeList (List ReceipePreview)
+    | ReceipeImporter Importer.Model
 
 
 type alias Model =
@@ -83,10 +86,12 @@ type Msg
     | GotNewReceipe (Result Http.Error Receipe.Receipe)
     | GotReceipeList (Result Http.Error (List ReceipePreview))
     | RoutedEditMsg ReceipeEditor.Model ReceipeEditor.Msg
+    | RoutedImportMsg Importer.Model Importer.Msg
     | RoutedReceipeMsg ReceipeViewer.Model ReceipeViewer.Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | CreateReceipe
+    | OpenReceipeImporter
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -102,7 +107,7 @@ update msg model =
                     )
 
                 Err _ ->
-                    ( { model | content = Failure }, Cmd.none )
+                    ( { model | content = Failure "Rezept laden fehlgeschlagen" }, Cmd.none )
 
         GotReceipeForEdit result ->
             case result of
@@ -110,7 +115,8 @@ update msg model =
                     ( { model | content = ReceipeEditor { currentImage = 0, receipe = receipe, errorMessage = "" } }, Cmd.none )
 
                 Err _ ->
-                    ( { model | content = Failure }, Cmd.none )
+                    ( { model 
+                    | content = Failure "Rezept zum Editieren laden fehlgeschlagen" }, Cmd.none )
 
         GotNewReceipe result ->
             case result of
@@ -118,7 +124,7 @@ update msg model =
                     ( { model | content = ReceipeViewer (ReceipeViewer.modelFromReceipe receipe "") }, Cmd.none )
 
                 Err _ ->
-                    ( { model | content = Failure }, Cmd.none )
+                    ( { model | content = Failure "Rezept konnte nicht geladen werden" }, Cmd.none )
 
         GotReceipeList result ->
             case result of
@@ -126,7 +132,7 @@ update msg model =
                     ( { model | content = ViewReceipeList receipes }, Cmd.none )
 
                 Err _ ->
-                    ( { model | content = Failure }, Cmd.none )
+                    ( { model | content = Failure "Rezeptliste konnte nicht geladen werden" }, Cmd.none )
 
         RoutedEditMsg subModel childMsg ->
             let
@@ -148,6 +154,15 @@ update msg model =
             , Cmd.map (RoutedReceipeMsg updatedReceipe) cmd
             )
 
+        RoutedImportMsg subModel childMsg ->
+            let
+                ( updatedModel, cmd ) =
+                    Importer.update childMsg subModel
+            in
+            ( { model | content = ReceipeImporter updatedModel }
+            , Cmd.map (RoutedImportMsg updatedModel) cmd
+            )
+
         UrlChanged url ->
             let
                 ( content, cmd ) =
@@ -164,7 +179,10 @@ update msg model =
                     ( model, Nav.load href )
 
         CreateReceipe ->
-            ( { model | content = Loading "new Receipe" }, getNewReceipe )
+            ( { model | content = Loading "neues Rezept" }, getNewReceipe )
+
+        OpenReceipeImporter ->
+            ( { model | content = Loading "Rezept Importer" }, Route.load Route.ImportReceipe)
 
 
 onUrlChange : Url.Url -> ( ModelContent, Cmd Msg )
@@ -179,8 +197,11 @@ onUrlChange url =
         Just Route.Overview ->
             ( Loading "Overview", getReceipeList )
 
+        Just Route.ImportReceipe ->
+            ( ReceipeImporter (Importer.EnterUrl ""), Cmd.none )
+
         Nothing ->
-            ( Failure, Cmd.none )
+            ( Failure "Url konnte nicht geparst werden", Cmd.none )
 
 
 
@@ -202,8 +223,8 @@ view model =
         "Receipe Manager"
         [ main_ []
             [ case model.content of
-                Failure ->
-                    text "that went wrong..."
+                Failure errorMsg ->
+                    text ("Fehler: " ++ errorMsg)
 
                 Loading msg ->
                     text ("loading " ++ msg ++ " ...")
@@ -218,6 +239,10 @@ view model =
 
                 ViewReceipeList receipeList ->
                     viewReceipeList receipeList
+
+                ReceipeImporter importerModel ->
+                    Html.map (RoutedImportMsg importerModel)
+                        (Importer.view importerModel)
             ]
         ]
 
@@ -227,6 +252,7 @@ viewReceipeList receipeList =
     div []
         [ h1 [] [ text "Rezepte-Übersicht" ]
         , button [ onClick CreateReceipe ] [ text "neues Rezept" ]
+        , button [ onClick OpenReceipeImporter ] [ text "Rezept importieren" ]
         , ul []
             (List.map
                 (\receipe ->
@@ -281,7 +307,7 @@ getReceipe msg id =
 getNewReceipe : Cmd Msg
 getNewReceipe =
     Http.post
-        { url = UB.absolute ["receipe", "create"] []
+        { url = UB.absolute [ "receipe", "create" ] []
         , body = Http.emptyBody
         , expect = Http.expectJson GotNewReceipe Receipe.decoder
         }
