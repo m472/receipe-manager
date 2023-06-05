@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -45,6 +46,12 @@ class IngredientGroup:
 
 
 @dataclass
+class InstructionGroup:
+    name: str
+    steps: list[str]
+
+
+@dataclass
 class Servings:
     amount: int
     unit: str
@@ -55,6 +62,7 @@ class Receipe:
     id: int
     title: str
     ingredients: list[IngredientGroup]
+    instructions: list[InstructionGroup]
     servings: Servings
     image_ids: list[int] = field(default_factory=list)
 
@@ -114,7 +122,6 @@ def home(path: str = "") -> str:
 
 @app.route("/receipe/list")
 def receipe_list() -> Response:
-    print(COOKBOOK.receipes.items())
     return jsonify(
         [
             {
@@ -141,8 +148,15 @@ def json_receipe_update() -> tuple[Response, int]:
     try:
         id = int(request.args["id"])
         receipe = from_json(Receipe, request.data)
-        receipe.save()
         assert receipe.id == id
+
+        # delete unreferenced images
+        for img_path in RECEIPE_IMG_DIR.iterdir():
+            m = re.match(f"{receipe.id}_(\\d+)", img_path.stem)
+            if m and int(m.group(1)) not in receipe.image_ids:
+                img_path.unlink()
+
+        receipe.save()
 
     except ValueError:
         status_code = 400
@@ -166,7 +180,14 @@ def json_receipe_update() -> tuple[Response, int]:
 @app.route("/receipe/create", methods=["POST"])
 def json_receipe_create() -> tuple[Response, int]:
     _id = max(COOKBOOK.receipes) + 1
-    new_receipe = Receipe(_id, "", [], Servings(4, "Portionen"))
+    new_receipe = Receipe(
+        id=_id,
+        title="",
+        ingredients=[],
+        servings=Servings(4, "Portionen"),
+        instructions=[],
+    )
+
     new_receipe.save()
 
     return jsonify(asdict(new_receipe) | {"units": COOKBOOK.units}), 200
@@ -203,6 +224,14 @@ def get_image() -> Response:
     receipe_id = int(request.args["receipe_id"])
     image_id = int(request.args["image_id"])
     return send_from_directory(RECEIPE_IMG_DIR, f"{receipe_id}_{image_id}.jpg")
+
+
+@app.route("/receipe/image/upload", methods=["PUT"])
+def upload_image() -> Response:
+    receipe_id = int(request.args["receipe_id"])
+    image_id = int(request.args["image_id"])
+    (RECEIPE_IMG_DIR / f"{receipe_id}_{image_id}.jpg").write_bytes(request.data)
+    return jsonify({"status": "success"})
 
 
 if __name__ == "__main__":
