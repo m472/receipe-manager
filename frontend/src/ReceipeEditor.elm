@@ -34,6 +34,7 @@ type alias EditableReceipe =
     , ingredients : List EditableIngredientGroup
     , instructions : List InstructionGroup
     , units : Dict String Receipe.Unit
+    , tags : String
     }
 
 
@@ -70,6 +71,7 @@ type Msg
     | UpdateTitle String
     | UpdateServingsAmount String
     | UpdateServingsUnit String
+    | UpdateTags String
     | RoutedIngredientGroupMsg Int IngredientGroupMsg
     | RoutedInstructionMsg Int InstructionGroupMsg
     | ReceipeUploaded (Result Http.Error ())
@@ -111,6 +113,13 @@ view : Model -> Html Msg
 view model =
     div []
         [ h1 [] [ text "Titel: ", input [ value model.receipe.title, onInput UpdateTitle ] [] ]
+        , input
+            [ type_ "text"
+            , value model.receipe.tags
+            , onInput UpdateTags
+            ]
+            []
+        , div [] (splitTags model.receipe.tags |> List.map (\s -> " " ++ s ++ " " |> text))
         , Html.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , input [ on "change" (JD.map GotImages filesDecoder), type_ "file", multiple True ]
             [ text "Bild auswählen" ]
@@ -339,6 +348,13 @@ updateReceipe msg model =
             , Cmd.none
             )
 
+        UpdateTags tagsStr ->
+            ( { model
+                | receipe = { receipe | tags = tagsStr }
+              }
+            , Cmd.none
+            )
+
         RemoveIngredientGroup index ->
             ( { model
                 | receipe =
@@ -384,8 +400,9 @@ updateReceipe msg model =
             case fromEditable receipe of
                 Just convertedReceipe ->
                     ( model, sendReceipe convertedReceipe )
+
                 Nothing ->
-                    ( {model| errorMessage = "Vor dem Speichern müssen alle Fehler bereinigt werden" }, Cmd.none )
+                    ( { model | errorMessage = "Vor dem Speichern müssen alle Fehler bereinigt werden" }, Cmd.none )
 
         ImageViewerMsg subMsg ->
             ( { model
@@ -481,13 +498,13 @@ updateIngredient msg model =
                 | amount =
                     case ( amountStr, String.toFloat amountStr ) of
                         ( "", _ ) ->
-                            Debug.log ("first branch: " ++ amountStr) Ok Nothing
+                            Ok Nothing
 
                         ( _, Just value ) ->
-                            Debug.log ("second branch: " ++ amountStr) Ok (Just value)
+                            Ok (Just value)
 
                         ( _, Nothing ) ->
-                            Debug.log ("third branch" ++ amountStr) Err { message = "Diese Eingabe konnte nicht in eine Zahl konvertiert werden", lastValidValue = lastValid, invalidValue = amountStr }
+                            Err { message = "Diese Eingabe konnte nicht in eine Zahl konvertiert werden", lastValidValue = lastValid, invalidValue = amountStr }
             }
 
 
@@ -601,6 +618,7 @@ toEditable receipe =
     , instructions = receipe.instructions
     , servings = { amount = Ok receipe.servings.amount, unit = receipe.servings.unit }
     , units = receipe.units
+    , tags = List.intersperse ", " receipe.tags |> String.concat
     }
 
 
@@ -624,10 +642,17 @@ fromEditable : EditableReceipe -> Maybe Receipe.Receipe
 fromEditable receipe =
     let
         maybeInstr =
-            List.map fromEditableIngredientGroup receipe.ingredients |> lift
+            Debug.log ("Tags: " ++ receipe.tags)
+                List.map
+                fromEditableIngredientGroup
+                receipe.ingredients
+                |> lift
 
         maybeServings =
             fromEditableServings receipe.servings
+
+        tags =
+            splitTags receipe.tags
     in
     case ( maybeInstr, maybeServings ) of
         ( Just ingredients, Just servings ) ->
@@ -639,6 +664,7 @@ fromEditable receipe =
                 , instructions = receipe.instructions
                 , servings = servings
                 , units = receipe.units
+                , tags = tags
                 }
 
         ( _, _ ) ->
@@ -647,10 +673,11 @@ fromEditable receipe =
 
 fromEditableIngredientGroup : EditableIngredientGroup -> Maybe Receipe.IngredientGroup
 fromEditableIngredientGroup ig =
-    let 
-        ingredients = List.map fromEditableIngredient ig.ingredients |> lift 
+    let
+        ingredients =
+            List.map fromEditableIngredient ig.ingredients |> lift
     in
-        Maybe.map (\ing -> { name = ig.name, ingredients=ing }) ingredients
+    Maybe.map (\ing -> { name = ig.name, ingredients = ing }) ingredients
 
 
 fromEditableIngredient : EditableIngredient -> Maybe Receipe.Ingredient
@@ -683,6 +710,11 @@ fromEditableServings s =
 
 
 -- HELPERS
+
+
+splitTags : String -> List String
+splitTags tagStr =
+    String.split "," tagStr |> List.map String.trim |> List.filter (not << String.isEmpty)
 
 
 getLastValid : Result (ParseError a) a -> a

@@ -16,6 +16,7 @@ type alias Receipe =
     , ingredients : List IngredientGroup
     , instructions : List InstructionGroup
     , units : Dict String Unit
+    , tags: List String
     }
 
 
@@ -67,6 +68,7 @@ encoder receipe =
         , ( "image_ids", JE.list JE.int receipe.image_ids )
         , ( "instructions", JE.list instructionGroupEncoder receipe.instructions )
         , ( "servings", servingsEncoder receipe.servings )
+        , ( "tags", JE.list JE.string receipe.tags )
         ]
 
 
@@ -120,7 +122,7 @@ maybeEncoder f value =
 
 decoder : JD.Decoder Receipe
 decoder =
-    JD.map7 Receipe
+    JD.map8 Receipe
         (JD.field "id" JD.int)
         (JD.field "title" JD.string)
         (JD.field "image_ids" (JD.list JD.int))
@@ -128,6 +130,7 @@ decoder =
         (JD.field "ingredients" (JD.list ingredientGroupDecoder))
         (JD.field "instructions" (JD.list instructionGroupDecoder))
         (JD.field "units" (JD.dict unitDecoder))
+        (JD.field "tags" (JD.list JD.string))
 
 
 servingsDecoder : JD.Decoder Servings

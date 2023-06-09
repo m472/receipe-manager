@@ -1,7 +1,6 @@
 module Route exposing (..)
 
 import Browser.Navigation as Nav
-import Url
 import Url.Parser exposing ((</>), (<?>))
 
 

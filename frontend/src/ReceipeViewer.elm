@@ -56,6 +56,7 @@ view model =
     div []
         [ a [ href "/" ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
+        , div [] (List.map (\s -> " " ++ s ++ " " |> text) receipe.tags)
         , Html.map ImageViewerMsg (viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , h2 [] [ text "Zutaten" ]
         , p []

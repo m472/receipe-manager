@@ -68,6 +68,7 @@ type alias ReceipePreview =
     { id : Int
     , title : String
     , image_ids : List Int
+    , tags : List String
     }
 
 
@@ -229,7 +230,7 @@ viewReceipeList receipeList =
             (List.map
                 (\receipe ->
                     li []
-                        [ a [ href ("/receipe/" ++ String.fromInt receipe.id) ]
+                        (a [ href ("/receipe/" ++ String.fromInt receipe.id) ]
                             [ text
                                 (case receipe.title of
                                     "" ->
@@ -239,7 +240,9 @@ viewReceipeList receipeList =
                                         title
                                 )
                             ]
-                        ]
+                            :: br [] []
+                            :: List.map (\s -> text (" " ++ s ++ " ")) receipe.tags
+                        )
                 )
                 receipeList
             )
@@ -261,10 +264,11 @@ getReceipeList =
 receipeListDecoder : JD.Decoder (List ReceipePreview)
 receipeListDecoder =
     JD.list
-        (JD.map3 ReceipePreview
+        (JD.map4 ReceipePreview
             (JD.field "id" JD.int)
             (JD.field "title" JD.string)
             (JD.field "image_ids" (JD.list JD.int))
+            (JD.field "tags" (JD.list JD.string))
         )
 
 

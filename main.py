@@ -65,6 +65,7 @@ class Receipe:
     instructions: list[InstructionGroup]
     servings: Servings
     image_ids: list[int] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     def get_image_ids(self) -> list[int]:
         return [
@@ -128,6 +129,7 @@ def receipe_list() -> Response:
                 "id": id,
                 "title": receipe.title,
                 "image_ids": receipe.image_ids,
+                "tags": receipe.tags,
             }
             for id, receipe in COOKBOOK.receipes.items()
         ]
