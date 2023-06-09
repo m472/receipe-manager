@@ -618,7 +618,7 @@ toEditable receipe =
     , instructions = receipe.instructions
     , servings = { amount = Ok receipe.servings.amount, unit = receipe.servings.unit }
     , units = receipe.units
-    , tags = List.intersperse ", " receipe.tags |> String.concat
+    , tags = String.join ", " receipe.tags
     }
 
 

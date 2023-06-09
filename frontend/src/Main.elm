@@ -7,10 +7,11 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode as JD
+import List
 import Receipe
 import ReceipeEditor
 import ReceipeViewer
-import Route
+import Route exposing (Route(..))
 import Url
 import Url.Parser exposing ((</>), (<?>))
 
@@ -45,7 +46,7 @@ type ModelContent
     | Loading String
     | ReceipeViewer ReceipeViewer.Model
     | ReceipeEditor ReceipeEditor.Model
-    | ViewReceipeList (List ReceipePreview)
+    | ViewReceipeList (List ReceipePreview) String
 
 
 type alias Model =
@@ -85,6 +86,7 @@ type Msg
     | RoutedReceipeMsg ReceipeViewer.Model ReceipeViewer.Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+    | SearchChanged String
     | CreateReceipe
 
 
@@ -122,7 +124,7 @@ update msg model =
         GotReceipeList result ->
             case result of
                 Ok receipes ->
-                    ( { model | content = ViewReceipeList receipes }, Cmd.none )
+                    ( { model | content = ViewReceipeList receipes "" }, Cmd.none )
 
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
@@ -161,6 +163,14 @@ update msg model =
 
                 Browser.External href ->
                     ( model, Nav.load href )
+
+        SearchChanged query ->
+            case model.content of
+                ViewReceipeList receipes _ ->
+                    ( { model | content = ViewReceipeList receipes query }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
         CreateReceipe ->
             ( { model | content = Loading "new Receipe" }, getNewReceipe )
@@ -215,38 +225,79 @@ view model =
                     Html.map (RoutedEditMsg receipeEditorModel)
                         (ReceipeEditor.view receipeEditorModel)
 
-                ViewReceipeList receipeList ->
-                    viewReceipeList receipeList
+                ViewReceipeList receipeList searchQuery ->
+                    viewReceipeList searchQuery receipeList
             ]
         ]
 
 
-viewReceipeList : List ReceipePreview -> Html Msg
-viewReceipeList receipeList =
+viewReceipeList : String -> List ReceipePreview -> Html Msg
+viewReceipeList searchQuery receipeList =
+    let
+        getTitle =
+            \receipe ->
+                case receipe.title of
+                    "" ->
+                        "Untitled"
+
+                    title ->
+                        title
+    in
     div []
         [ h1 [] [ text "Rezepte-Übersicht" ]
         , button [ onClick CreateReceipe ] [ text "neues Rezept" ]
+        , input [ type_ "search", placeholder "Suche...", onInput SearchChanged ] []
         , ul []
             (List.map
                 (\receipe ->
                     li []
                         (a [ href ("/receipe/" ++ String.fromInt receipe.id) ]
-                            [ text
-                                (case receipe.title of
-                                    "" ->
-                                        "Untitled"
-
-                                    title ->
-                                        title
-                                )
-                            ]
+                            (highlightSearchResult searchQuery (getTitle receipe))
                             :: br [] []
-                            :: List.map (\s -> text (" " ++ s ++ " ")) receipe.tags
+                            :: List.map (\s -> div [] (highlightSearchResult searchQuery s)) receipe.tags
                         )
                 )
-                receipeList
+                (filterReceipes searchQuery receipeList)
             )
         ]
+
+
+highlightSearchResult : String -> String -> List (Html a)
+highlightSearchResult query txt =
+    let
+        indices =
+            String.indices (String.toLower query) (String.toLower txt)
+    in
+    case query of
+        "" ->
+            [ text txt ]
+
+        _ ->
+            highlightSearchResult_ (String.length query) indices txt
+
+
+highlightSearchResult_ : Int -> List Int -> String -> List (Html a)
+highlightSearchResult_ length startingPositions txt =
+    case startingPositions of
+        [] ->
+            [ text txt ]
+
+        x :: xs ->
+            text (String.left x txt)
+                :: em [] [ String.slice x (x + length) txt |> text ]
+                :: highlightSearchResult_ length xs (String.dropLeft (length + x) txt)
+
+
+filterReceipes : String -> List ReceipePreview -> List ReceipePreview
+filterReceipes searchQuery receipeList =
+    let
+        getFields =
+            \r -> r.title :: r.tags
+
+        matches =
+            String.toLower >> String.contains (String.toLower searchQuery)
+    in
+    List.filter (\r -> List.any matches (getFields r)) receipeList
 
 
 
