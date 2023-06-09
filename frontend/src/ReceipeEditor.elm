@@ -647,15 +647,10 @@ fromEditable receipe =
 
 fromEditableIngredientGroup : EditableIngredientGroup -> Maybe Receipe.IngredientGroup
 fromEditableIngredientGroup ig =
-    case List.map fromEditableIngredient ig.ingredients |> lift of
-        Just ingredients ->
-            Just
-                { name = ig.name
-                , ingredients = ingredients
-                }
-
-        Nothing ->
-            Nothing
+    let 
+        ingredients = List.map fromEditableIngredient ig.ingredients |> lift 
+    in
+        Maybe.map (\ing -> { name = ig.name, ingredients=ing }) ingredients
 
 
 fromEditableIngredient : EditableIngredient -> Maybe Receipe.Ingredient
