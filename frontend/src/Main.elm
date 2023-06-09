@@ -284,7 +284,7 @@ highlightSearchResult_ length startingPositions txt =
 
         x :: xs ->
             text (String.left x txt)
-                :: em [] [ String.slice x (x + length) txt |> text ]
+                :: mark [] [ String.slice x (x + length) txt |> text ]
                 :: highlightSearchResult_ length xs (String.dropLeft (length + x) txt)
 
 
