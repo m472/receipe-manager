@@ -105,7 +105,7 @@ update msg model =
         GotReceipeForEdit result ->
             case result of
                 Ok receipe ->
-                    ( { model | content = ReceipeEditor { currentImage = 0, receipe = receipe, errorMessage = "" } }, Cmd.none )
+                    ( { model | content = ReceipeEditor { currentImage = 0, receipe = ReceipeEditor.toEditable receipe, errorMessage = "" } }, Cmd.none )
 
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )

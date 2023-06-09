@@ -4,7 +4,7 @@ import Array
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Receipe exposing (Receipe)
+import Receipe exposing (ReceipeID)
 import Url.Builder
 
 
@@ -17,16 +17,16 @@ type Msg
 -- VIEW
 
 
-viewImages : Receipe -> Int -> Html Msg
-viewImages receipe currentImage =
-    case Array.get currentImage (Array.fromList receipe.image_ids) of
+viewImages : ReceipeID -> List Int -> Int -> Html Msg
+viewImages receipeId imageIds currentImage =
+    case Array.get currentImage (Array.fromList imageIds) of
         Just value ->
             div []
                 [ button [ onClick PrevImage ] [ text "<" ]
                 , img
                     [ src
                         (Url.Builder.absolute [ "receipe", "image" ]
-                            [ Url.Builder.int "receipe_id" receipe.id
+                            [ Url.Builder.int "receipe_id" receipeId
                             , Url.Builder.int "image_id" value
                             ]
                         )
@@ -44,11 +44,11 @@ viewImages receipe currentImage =
 -- UPDATE
 
 
-update : Msg -> Receipe -> Int -> Int
-update msg receipe currentImage =
+update : Msg -> List Int -> Int -> Int
+update msg image_ids currentImage =
     let
         imgCount =
-            List.length receipe.image_ids
+            List.length image_ids
     in
     case msg of
         NextImage ->

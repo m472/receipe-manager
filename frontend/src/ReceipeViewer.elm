@@ -56,7 +56,7 @@ view model =
     div []
         [ a [ href "/" ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
-        , Html.map ImageViewerMsg (viewImages model.receipe model.currentImage)
+        , Html.map ImageViewerMsg (viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , h2 [] [ text "Zutaten" ]
         , p []
             [ b []
@@ -149,7 +149,7 @@ update msg model =
             ( { model
                 | currentImage =
                     ReceipeImageViewer.update childMsg
-                        model.receipe
+                        model.receipe.image_ids
                         model.currentImage
               }
             , Cmd.none

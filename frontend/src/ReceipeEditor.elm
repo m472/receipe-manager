@@ -2,7 +2,7 @@ module ReceipeEditor exposing (..)
 
 import Dict exposing (Dict)
 import File exposing (File)
-import Helpers
+import Helpers exposing (lift)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -20,9 +20,47 @@ import Url.Builder
 
 
 type alias Model =
-    { receipe : Receipe.Receipe
+    { receipe : EditableReceipe
     , currentImage : Int
     , errorMessage : String
+    }
+
+
+type alias EditableReceipe =
+    { id : Receipe.ReceipeID
+    , title : String
+    , image_ids : List Int
+    , servings : EditableServings
+    , ingredients : List EditableIngredientGroup
+    , instructions : List InstructionGroup
+    , units : Dict String Receipe.Unit
+    }
+
+
+type alias EditableServings =
+    { amount : Result (ParseError Int) Int
+    , unit : String
+    }
+
+
+type alias EditableIngredientGroup =
+    { name : String
+    , ingredients : List EditableIngredient
+    }
+
+
+type alias EditableIngredient =
+    { amount : Result (ParseError (Maybe Float)) (Maybe Float)
+    , unit : String
+    , name : String
+    , comment : Maybe String
+    }
+
+
+type alias ParseError a =
+    { message : String
+    , lastValidValue : a
+    , invalidValue : String
     }
 
 
@@ -73,7 +111,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ h1 [] [ text "Titel: ", input [ value model.receipe.title, onInput UpdateTitle ] [] ]
-        , Html.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe model.currentImage)
+        , Html.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , input [ on "change" (JD.map GotImages filesDecoder), type_ "file", multiple True ]
             [ text "Bild auswählen" ]
         , button [ onClick DeleteImage ] [ text "Bild löschen" ]
@@ -81,12 +119,7 @@ view model =
         , p []
             [ b []
                 [ text "Zutaten für "
-                , input
-                    [ type_ "number"
-                    , value (String.fromInt model.receipe.servings.amount)
-                    , onInput UpdateServingsAmount
-                    ]
-                    []
+                , viewEditInt UpdateServingsAmount model.receipe.servings.amount
                 , text " "
                 , input
                     [ value model.receipe.servings.unit
@@ -105,12 +138,15 @@ view model =
                 (\i ig -> viewInstructionGroup i ig)
                 model.receipe.instructions
             )
+        , br [] []
+        , text model.errorMessage
+        , br [] []
         , button [ onClick Save ] [ text "Speichern" ]
         , button [ onClick CancelEdit ] [ text "Abbrechen" ]
         ]
 
 
-viewIngredientGroup : Receipe.Receipe -> Int -> Receipe.IngredientGroup -> Html Msg
+viewIngredientGroup : EditableReceipe -> Int -> EditableIngredientGroup -> Html Msg
 viewIngredientGroup receipe i ingredientGroup =
     let
         mapMessages =
@@ -133,16 +169,11 @@ viewIngredientGroup receipe i ingredientGroup =
         ]
 
 
-viewIngredient : Dict String Receipe.Unit -> Int -> Int -> Receipe.Ingredient -> Html Msg
+viewIngredient : Dict String Receipe.Unit -> Int -> Int -> EditableIngredient -> Html Msg
 viewIngredient units i j ingredient =
     li []
         (List.map (Html.map (\msg -> RoutedIngredientGroupMsg i (RoutedIngredientMsg j msg)))
-            [ input
-                [ type_ "number"
-                , value (Helpers.viewMaybeFloat 1 ingredient.amount)
-                , onInput UpdateAmount
-                ]
-                []
+            [ viewEditMaybeFloat UpdateAmount ingredient.amount
             , viewUnit ingredient.unit units
             , text " "
             , input
@@ -162,6 +193,52 @@ viewIngredient units i j ingredient =
                     (button [ onClick (RemoveIngredient j) ] [ text "-" ])
                ]
         )
+
+
+viewEditFloat : (String -> b) -> Result (ParseError Float) Float -> Html b
+viewEditFloat onInputMsg =
+    viewEditNumber onInputMsg String.fromFloat
+
+
+viewEditInt : (String -> b) -> Result (ParseError Int) Int -> Html b
+viewEditInt onInputMsg =
+    viewEditNumber onInputMsg String.fromInt
+
+
+viewEditMaybeFloat : (String -> b) -> Result (ParseError (Maybe Float)) (Maybe Float) -> Html b
+viewEditMaybeFloat onInputMsg =
+    viewEditNumber
+        onInputMsg
+        (\maybeVal ->
+            case maybeVal of
+                Just value ->
+                    String.fromFloat value
+
+                Nothing ->
+                    ""
+        )
+
+
+viewEditNumber : (String -> b) -> (a -> String) -> Result (ParseError a) a -> Html b
+viewEditNumber onInputMsg fromNumber parseResult =
+    let
+        ( val, msg ) =
+            case parseResult of
+                Ok parsed ->
+                    ( fromNumber parsed, text "" )
+
+                Err errorInfo ->
+                    ( errorInfo.invalidValue, text errorInfo.message )
+    in
+    div []
+        [ input
+            [ type_ "text"
+            , value val
+            , onInput onInputMsg
+            ]
+            []
+        , msg
+        ]
 
 
 viewUnit : String -> Dict.Dict String Receipe.Unit -> Html IngredientMsg
@@ -228,7 +305,7 @@ updateReceipe msg model =
     in
     case msg of
         AddIngredientGroup ->
-            ( { model | receipe = { receipe | ingredients = receipe.ingredients ++ [ Receipe.IngredientGroup "" [] ] } }, Cmd.none )
+            ( { model | receipe = { receipe | ingredients = receipe.ingredients ++ [ EditableIngredientGroup "" [] ] } }, Cmd.none )
 
         UpdateTitle newName ->
             ( { model | receipe = { receipe | title = newName } }, Cmd.none )
@@ -246,21 +323,21 @@ updateReceipe msg model =
                     receipe.servings
 
                 newAmount =
-                    String.toInt amountStr
-            in
-            case newAmount of
-                Just value ->
-                    ( { model
-                        | receipe =
-                            { receipe
-                                | servings = { servs | amount = value }
-                            }
-                      }
-                    , Cmd.none
-                    )
+                    case String.toInt amountStr of
+                        Just value ->
+                            Ok value
 
-                Nothing ->
-                    ( model, Cmd.none )
+                        Nothing ->
+                            Err { message = "Diese Eingabe konnte nicht in eine Zahl konvertiert werden", lastValidValue = getLastValid model.receipe.servings.amount, invalidValue = amountStr }
+            in
+            ( { model
+                | receipe =
+                    { receipe
+                        | servings = { servs | amount = newAmount }
+                    }
+              }
+            , Cmd.none
+            )
 
         RemoveIngredientGroup index ->
             ( { model
@@ -304,12 +381,16 @@ updateReceipe msg model =
             ( model, Route.load (Route.ViewReceipe receipe.id) )
 
         Save ->
-            ( model, sendReceipe receipe )
+            case fromEditable receipe of
+                Just convertedReceipe ->
+                    ( model, sendReceipe convertedReceipe )
+                Nothing ->
+                    ( {model| errorMessage = "Vor dem Speichern müssen alle Fehler bereinigt werden" }, Cmd.none )
 
         ImageViewerMsg subMsg ->
             ( { model
                 | currentImage =
-                    ReceipeImageViewer.update subMsg receipe model.currentImage
+                    ReceipeImageViewer.update subMsg receipe.image_ids model.currentImage
               }
             , Cmd.none
             )
@@ -374,8 +455,17 @@ updateReceipe msg model =
             )
 
 
-updateIngredient : IngredientMsg -> Receipe.Ingredient -> Receipe.Ingredient
+updateIngredient : IngredientMsg -> EditableIngredient -> EditableIngredient
 updateIngredient msg model =
+    let
+        lastValid =
+            case model.amount of
+                Ok valid ->
+                    valid
+
+                Err parseError ->
+                    parseError.lastValidValue
+    in
     case msg of
         UpdateIngredientName newName ->
             { model | name = newName }
@@ -387,13 +477,24 @@ updateIngredient msg model =
             { model | comment = Just newComment }
 
         UpdateAmount amountStr ->
-            { model | amount = String.toFloat amountStr }
+            { model
+                | amount =
+                    case ( amountStr, String.toFloat amountStr ) of
+                        ( "", _ ) ->
+                            Debug.log ("first branch: " ++ amountStr) Ok Nothing
+
+                        ( _, Just value ) ->
+                            Debug.log ("second branch: " ++ amountStr) Ok (Just value)
+
+                        ( _, Nothing ) ->
+                            Debug.log ("third branch" ++ amountStr) Err { message = "Diese Eingabe konnte nicht in eine Zahl konvertiert werden", lastValidValue = lastValid, invalidValue = amountStr }
+            }
 
 
 updateIngredientGroup :
     IngredientGroupMsg
-    -> Receipe.IngredientGroup
-    -> Receipe.IngredientGroup
+    -> EditableIngredientGroup
+    -> EditableIngredientGroup
 updateIngredientGroup msg model =
     case msg of
         UpdateGroupName newName ->
@@ -403,7 +504,7 @@ updateIngredientGroup msg model =
             { model
                 | ingredients =
                     model.ingredients
-                        ++ [ Receipe.Ingredient Nothing "" "" Nothing ]
+                        ++ [ EditableIngredient (Ok Nothing) "" "" Nothing ]
             }
 
         RemoveIngredient index ->
@@ -455,7 +556,7 @@ sendReceipe receipe =
         }
 
 
-uploadImage : File -> Receipe.Receipe -> ( Receipe.Receipe, Cmd Msg )
+uploadImage : File -> EditableReceipe -> ( EditableReceipe, Cmd Msg )
 uploadImage file receipe =
     let
         newImgId =
@@ -485,3 +586,115 @@ uploadImage file receipe =
 filesDecoder : JD.Decoder (List File)
 filesDecoder =
     JD.at [ "target", "files" ] (JD.list File.decoder)
+
+
+
+-- CONVERTER
+
+
+toEditable : Receipe.Receipe -> EditableReceipe
+toEditable receipe =
+    { id = receipe.id
+    , title = receipe.title
+    , image_ids = receipe.image_ids
+    , ingredients = List.map toEditableIngredientGroup receipe.ingredients
+    , instructions = receipe.instructions
+    , servings = { amount = Ok receipe.servings.amount, unit = receipe.servings.unit }
+    , units = receipe.units
+    }
+
+
+toEditableIngredientGroup : Receipe.IngredientGroup -> EditableIngredientGroup
+toEditableIngredientGroup ig =
+    { name = ig.name
+    , ingredients = List.map toEditableIngredient ig.ingredients
+    }
+
+
+toEditableIngredient : Receipe.Ingredient -> EditableIngredient
+toEditableIngredient ing =
+    { amount = Ok ing.amount
+    , name = ing.name
+    , unit = ing.unit
+    , comment = ing.comment
+    }
+
+
+fromEditable : EditableReceipe -> Maybe Receipe.Receipe
+fromEditable receipe =
+    let
+        maybeInstr =
+            List.map fromEditableIngredientGroup receipe.ingredients |> lift
+
+        maybeServings =
+            fromEditableServings receipe.servings
+    in
+    case ( maybeInstr, maybeServings ) of
+        ( Just ingredients, Just servings ) ->
+            Just
+                { id = receipe.id
+                , title = receipe.title
+                , image_ids = receipe.image_ids
+                , ingredients = ingredients
+                , instructions = receipe.instructions
+                , servings = servings
+                , units = receipe.units
+                }
+
+        ( _, _ ) ->
+            Nothing
+
+
+fromEditableIngredientGroup : EditableIngredientGroup -> Maybe Receipe.IngredientGroup
+fromEditableIngredientGroup ig =
+    case List.map fromEditableIngredient ig.ingredients |> lift of
+        Just ingredients ->
+            Just
+                { name = ig.name
+                , ingredients = ingredients
+                }
+
+        Nothing ->
+            Nothing
+
+
+fromEditableIngredient : EditableIngredient -> Maybe Receipe.Ingredient
+fromEditableIngredient ing =
+    case ing.amount of
+        Err _ ->
+            Nothing
+
+        Ok value ->
+            Just
+                { amount = value
+                , name = ing.name
+                , unit = ing.unit
+                , comment = ing.comment
+                }
+
+
+fromEditableServings : EditableServings -> Maybe Receipe.Servings
+fromEditableServings s =
+    case s.amount of
+        Err _ ->
+            Nothing
+
+        Ok value ->
+            Just
+                { amount = value
+                , unit = s.unit
+                }
+
+
+
+-- HELPERS
+
+
+getLastValid : Result (ParseError a) a -> a
+getLastValid result =
+    case result of
+        Ok value ->
+            value
+
+        Err errorInfo ->
+            errorInfo.lastValidValue

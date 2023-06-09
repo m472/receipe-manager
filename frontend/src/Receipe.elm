@@ -1,4 +1,4 @@
-module Receipe exposing (Ingredient, IngredientGroup, InstructionGroup, Receipe, Unit, decoder, encoder)
+module Receipe exposing (Ingredient, IngredientGroup, InstructionGroup, Receipe, Unit, Servings, decoder, encoder, ReceipeID)
 
 import Dict exposing (Dict)
 import Html exposing (..)
@@ -9,7 +9,7 @@ import Json.Encode as JE
 
 
 type alias Receipe =
-    { id : Int
+    { id : ReceipeID
     , title : String
     , image_ids : List Int
     , servings : Servings
@@ -51,6 +51,8 @@ type alias InstructionGroup =
     , steps : List String
     }
 
+
+type alias ReceipeID = Int
 
 
 -- ENCODERS
