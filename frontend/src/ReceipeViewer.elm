@@ -56,7 +56,7 @@ view model =
             toFloat model.servings / toFloat receipe.servings.amount
     in
     div []
-        [ a [ href "/" ] [ text "Alle Rezepte" ]
+        [ a [ href (Route.Overview Nothing |> Route.toString) ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
         , div [] (List.map (\t -> tagButton [] [text t]) receipe.tags)
         , Html.Styled.map ImageViewerMsg (viewImages model.receipe.id model.receipe.image_ids model.currentImage)
