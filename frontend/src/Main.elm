@@ -18,7 +18,6 @@ import ReceipeEditor
 import ReceipeViewer
 import Route exposing (Route(..))
 import Url
-import Url.Builder as UB
 import Set
 import StyledElements exposing (..)
 import Url
@@ -411,8 +410,8 @@ viewNavBar receipeList =
 
 getReceipeList : (Result Http.Error (List ReceipePreview) -> Msg) -> Cmd Msg
 getReceipeList msg =
-    Http.get
-        { url = Api.ReceipeList |> Api.toString
+    Api.get
+        { endpoint = Api.ReceipeList
         , expect = Http.expectJson msg receipeListDecoder
         }
 
@@ -430,16 +429,16 @@ receipeListDecoder =
 
 getReceipe : (Result Http.Error Receipe.Receipe -> Msg) -> Int -> Cmd Msg
 getReceipe msg id =
-    Http.get
-        { url = Api.Receipe id |> Api.toString
+    Api.get
+        { endpoint = Api.Receipe id
         , expect = Http.expectJson msg Receipe.decoder
         }
 
 
 getNewReceipe : Cmd Msg
 getNewReceipe =
-    Http.post
-        { url = UB.absolute [ "receipe", "create" ] []
+    Api.post
+        { endpoint = Api.CreateReceipe
         , body = Http.emptyBody
         , expect = Http.expectJson GotNewReceipe Receipe.decoder
         }

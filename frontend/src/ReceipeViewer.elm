@@ -9,8 +9,8 @@ import Http
 import Receipe exposing (..)
 import ReceipeImageViewer exposing (viewImages)
 import Route
-import StyledElements
-import StyledElements exposing (tagButton)
+import StyledElements exposing (..)
+import Api
 
 
 
@@ -138,7 +138,7 @@ update msg model =
                     ( model, Cmd.none )
 
         Delete ->
-            ( model, deleteReceipe model.receipe.id )
+            ( model, Api.deleteReceipe Deleted model.receipe.id )
 
         Deleted result ->
             case result of
@@ -160,13 +160,3 @@ update msg model =
 
 
 
--- HTTP
-
-
-deleteReceipe : Int -> Cmd Msg
-deleteReceipe id =
-    Http.post
-        { url = "/receipe/delete?id=" ++ String.fromInt id
-        , body = Http.emptyBody
-        , expect = Http.expectString Deleted
-        }

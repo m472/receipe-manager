@@ -51,7 +51,7 @@ update msg model =
         ( EnterUrl url, Import ) ->
             ( Loading, getImportReceipe url )
 
-        -- ignore messages from non matching states
+        -- ignore messages from non-matching states
         ( _, _ ) ->
             ( model, Cmd.none )
 
@@ -62,7 +62,7 @@ update msg model =
 
 getImportReceipe : String -> Cmd Msg
 getImportReceipe url =
-    Http.get
-        { url = Api.ImportReceipe url |> Api.toString
+    Api.get
+        { endpoint = Api.ImportReceipe url
         , expect = Http.expectJson ImportResult Receipe.decoder
         }
