@@ -14,6 +14,7 @@ import Receipe exposing (InstructionGroup)
 import ReceipeImageViewer
 import Route
 import Url.Builder
+import StyledElements exposing (tagButton)
 
 
 
@@ -120,7 +121,7 @@ view model =
             , onInput UpdateTags
             ]
             []
-        , div [] (splitTags model.receipe.tags |> List.map (\s -> " " ++ s ++ " " |> text))
+        , div [] (splitTags model.receipe.tags |> List.map (\t -> tagButton [href "#"] [text t]))
         , Html.Styled.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , input [ on "change" (JD.map GotImages filesDecoder), type_ "file", multiple True ]
             [ text "Bild auswählen" ]
@@ -643,8 +644,7 @@ fromEditable : EditableReceipe -> Maybe Receipe.Receipe
 fromEditable receipe =
     let
         maybeInstr =
-            Debug.log ("Tags: " ++ receipe.tags)
-                List.map
+            List.map
                 fromEditableIngredientGroup
                 receipe.ingredients
                 |> lift

@@ -143,10 +143,10 @@ update msg model =
         Deleted result ->
             case result of
                 Ok _ ->
-                    ( model, Route.load Route.Overview )
+                    ( model, Route.load (Route.Overview Nothing))
 
                 Err _ ->
-                    ( model, Route.load Route.Overview )
+                    ( model, Route.load (Route.Overview Nothing))
 
         ImageViewerMsg childMsg ->
             ( { model

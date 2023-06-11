@@ -3,7 +3,6 @@ module Main exposing (..)
 import Browser
 import Browser.Navigation as Nav
 import Css exposing (..)
-import Html
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (..)
 import Html.Styled.Events exposing (..)
@@ -51,8 +50,7 @@ type ModelContent
     | Loading String
     | ReceipeViewer ReceipeViewer.Model
     | ReceipeEditor ReceipeEditor.Model
-    | ViewReceipeList (List ReceipePreview) String
-    | CategoryView (List ReceipePreview) String
+    | ViewReceipeList (Maybe String) (List ReceipePreview) String
 
 
 type alias Model =
@@ -87,8 +85,7 @@ type Msg
     = GotReceipe (Result Http.Error Receipe.Receipe)
     | GotReceipeForEdit (Result Http.Error Receipe.Receipe)
     | GotNewReceipe (Result Http.Error Receipe.Receipe)
-    | GotReceipeList (Result Http.Error (List ReceipePreview))
-    | GotReceipeCategory String (Result Http.Error (List ReceipePreview))
+    | GotReceipeList (Maybe String) (Result Http.Error (List ReceipePreview))
     | RoutedEditMsg ReceipeEditor.Model ReceipeEditor.Msg
     | RoutedReceipeMsg ReceipeViewer.Model ReceipeViewer.Msg
     | LinkClicked Browser.UrlRequest
@@ -115,7 +112,13 @@ update msg model =
         GotReceipeForEdit result ->
             case result of
                 Ok receipe ->
-                    ( { model | content = ReceipeEditor { currentImage = 0, receipe = ReceipeEditor.toEditable receipe, errorMessage = "" } }, Cmd.none )
+                    ( { model
+                        | content =
+                            ReceipeEditor
+                                { currentImage = 0, receipe = ReceipeEditor.toEditable receipe, errorMessage = "" }
+                      }
+                    , Cmd.none
+                    )
 
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
@@ -128,12 +131,12 @@ update msg model =
                 Err _ ->
                     ( { model | content = Failure }, Cmd.none )
 
-        GotReceipeList result ->
-            case result of
-                Ok receipes ->
-                    ( { model | content = ViewReceipeList receipes "" }, Cmd.none )
+        GotReceipeList maybeTag result ->
+            case ( maybeTag, result ) of
+                ( tag, Ok receipes ) ->
+                    ( { model | content = ViewReceipeList tag receipes "" }, Cmd.none )
 
-                Err _ ->
+                ( _, Err _ ) ->
                     ( { model | content = Failure }, Cmd.none )
 
         RoutedEditMsg subModel childMsg ->
@@ -173,22 +176,14 @@ update msg model =
 
         SearchChanged query ->
             case model.content of
-                ViewReceipeList receipes _ ->
-                    ( { model | content = ViewReceipeList receipes query }, Cmd.none )
+                ViewReceipeList tags receipes _ ->
+                    ( { model | content = ViewReceipeList tags receipes query }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
         CreateReceipe ->
             ( { model | content = Loading "new Receipe" }, getNewReceipe )
-
-        GotReceipeCategory tag result ->
-            case result of
-                Ok receipeList ->
-                    ( { model | content = CategoryView receipeList tag }, Cmd.none )
-
-                Err _ ->
-                    ( { model | content = Failure }, Cmd.none )
 
 
 onUrlChange : Url.Url -> ( ModelContent, Cmd Msg )
@@ -200,11 +195,8 @@ onUrlChange url =
         Just (Route.EditReceipe id) ->
             ( Loading ("ReceipeEditor" ++ String.fromInt id), getReceipe GotReceipeForEdit id )
 
-        Just Route.Overview ->
-            ( Loading "Overview", getReceipeList GotReceipeList )
-
-        Just (Route.ViewCategory tag) ->
-            ( Loading "Category", getReceipeList (GotReceipeCategory tag) )
+        Just (Route.Overview maybeTag) ->
+            ( Loading "Overview", getReceipeList (GotReceipeList maybeTag) )
 
         Nothing ->
             ( Failure, Cmd.none )
@@ -244,24 +236,21 @@ view model =
                         Html.Styled.map (RoutedEditMsg receipeEditorModel)
                             (ReceipeEditor.view receipeEditorModel)
 
-                    ViewReceipeList receipeList searchQuery ->
-                        viewReceipeOverview searchQuery receipeList
-
-                    CategoryView receipeList tag ->
-                        viewCategory receipeList tag
+                    ViewReceipeList tag receipeList searchQuery ->
+                        viewReceipeOverview tag searchQuery receipeList
                 ]
             ]
         )
 
 
-viewReceipeOverview : String -> List ReceipePreview -> Html Msg
-viewReceipeOverview searchQuery receipeList =
+viewReceipeOverview : Maybe String -> String -> List ReceipePreview -> Html Msg
+viewReceipeOverview tag searchQuery receipeList =
     div []
         [ viewNavBar receipeList
         , h1 [] [ text "Rezepte-Übersicht" ]
         , button [ onClick CreateReceipe ] [ text "neues Rezept" ]
         , input [ type_ "search", placeholder "Suche...", onInput SearchChanged ] []
-        , viewReceipes searchQuery (filterReceipes searchQuery receipeList)
+        , viewReceipes searchQuery (searchReceipes searchQuery receipeList |> filterByTag tag)
         ]
 
 
@@ -301,19 +290,21 @@ viewReceipes searchQuery receipeList =
                             ]
                             []
                         ]
-                    , div [ css [ margin2 (pt 0) (pt 10)] ]
+                    , div [ css [ margin2 (pt 0) (pt 10) ] ]
                         (div
                             [ css
-                                [ fontFamilies [ "Helvetica", "Arial" ] 
+                                [ fontFamilies [ "Helvetica", "Arial" ]
                                 , margin (pt 2)
                                 , fontSize (pt 16)
                                 ]
                             ]
-                            [ a [ receipeLink, css [textDecoration none, color (hex "000000")] ] (highlightSearchResult searchQuery (getTitle receipe)) ]
+                            [ a [ receipeLink, css [ textDecoration none, color (hex "000000") ] ]
+                                (highlightSearchResult searchQuery (getTitle receipe))
+                            ]
                             :: List.map
                                 (\t ->
                                     tagButton
-                                        [ href (Url.Builder.absolute [ "category", Url.percentEncode t ] []) ]
+                                        [ href (Url.Builder.absolute [] [ Url.Builder.string "tag" t ]) ]
                                         (highlightSearchResult searchQuery t)
                                 )
                                 receipe.tags
@@ -350,8 +341,8 @@ highlightSearchResult_ length startingPositions txt =
                 :: highlightSearchResult_ length xs (String.dropLeft (length + x) txt)
 
 
-filterReceipes : String -> List ReceipePreview -> List ReceipePreview
-filterReceipes searchQuery receipeList =
+searchReceipes : String -> List ReceipePreview -> List ReceipePreview
+searchReceipes searchQuery receipeList =
     let
         getFields =
             \r -> r.title :: r.tags
@@ -362,20 +353,14 @@ filterReceipes searchQuery receipeList =
     List.filter (\r -> List.any matches (getFields r)) receipeList
 
 
-viewCategory : List ReceipePreview -> String -> Html a
-viewCategory receipeList tag =
-    let
-        decodedTag =
-            Url.percentDecode tag |> Maybe.withDefault tag
+filterByTag : Maybe String -> List ReceipePreview -> List ReceipePreview
+filterByTag maybeTag receipeList =
+    case maybeTag of
+        Just tag ->
+            List.filter (\r -> List.member tag r.tags) receipeList
 
-        filteredReceipes =
-            List.filter (\r -> List.member (String.toLower decodedTag) (List.map String.toLower r.tags)) receipeList
-    in
-    div []
-        [ viewNavBar receipeList
-        , h1 [] [ text decodedTag ]
-        , viewReceipes "" filteredReceipes
-        ]
+        Nothing ->
+            receipeList
 
 
 viewNavBar : List ReceipePreview -> Html a
@@ -384,7 +369,10 @@ viewNavBar receipeList =
         tags =
             List.concatMap .tags receipeList |> Set.fromList |> Set.toList
     in
-    nav [] (tagButton [ href "/" ] [ text "Alle Rezepte" ] :: List.map (\t -> tagButton [ href ("/category/" ++ t) ] [ text t ]) tags)
+    nav []
+        (tagButton [ href "/" ] [ text "Alle Rezepte" ]
+            :: List.map (\t -> tagButton [ href ("/?tag=" ++ t) ] [ text t ]) tags
+        )
 
 
 
