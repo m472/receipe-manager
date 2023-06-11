@@ -2,6 +2,7 @@ module Route exposing (..)
 
 import Browser.Navigation as Nav
 import Url.Parser exposing ((</>), (<?>))
+import Url.Builder
 
 
 
@@ -12,6 +13,7 @@ type Route
     = Overview
     | ViewReceipe Int
     | EditReceipe Int
+    | ViewCategory String
 
 
 parse : Url.Parser.Parser (Route -> a) a
@@ -21,6 +23,7 @@ parse =
         , Url.Parser.map EditReceipe
             (Url.Parser.s "receipe" </> Url.Parser.s "edit" </> Url.Parser.int)
         , Url.Parser.map Overview Url.Parser.top
+        , Url.Parser.map ViewCategory (Url.Parser.s "category" </> Url.Parser.string)
         ]
 
 
@@ -40,4 +43,7 @@ load route =
 
             EditReceipe id ->
                 "/receipe/edit/" ++ String.fromInt id
+
+            ViewCategory tag ->
+                Url.Builder.absolute ["category", tag] []
         )
