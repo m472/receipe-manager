@@ -2,9 +2,11 @@ module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (..)
+import Css exposing (..)
+import Html
+import Html.Styled exposing (..)
+import Html.Styled.Attributes exposing (..)
+import Html.Styled.Events exposing (..)
 import Http
 import Json.Decode as JD exposing (Error(..))
 import List
@@ -13,6 +15,7 @@ import ReceipeEditor
 import ReceipeViewer
 import Route exposing (Route(..))
 import Set
+import StyledElements exposing (..)
 import Url
 import Url.Builder
 import Url.Parser exposing ((</>), (<?>))
@@ -224,29 +227,31 @@ view : Model -> Browser.Document Msg
 view model =
     Browser.Document
         "Receipe Manager"
-        [ main_ []
-            [ case model.content of
-                Failure ->
-                    text "that went wrong..."
+        (List.map toUnstyled
+            [ main_ []
+                [ case model.content of
+                    Failure ->
+                        text "that went wrong..."
 
-                Loading msg ->
-                    text ("loading " ++ msg ++ " ...")
+                    Loading msg ->
+                        text ("loading " ++ msg ++ " ...")
 
-                ReceipeViewer receipeViewerModel ->
-                    Html.map (RoutedReceipeMsg receipeViewerModel)
-                        (ReceipeViewer.view receipeViewerModel)
+                    ReceipeViewer receipeViewerModel ->
+                        Html.Styled.map (RoutedReceipeMsg receipeViewerModel)
+                            (ReceipeViewer.view receipeViewerModel)
 
-                ReceipeEditor receipeEditorModel ->
-                    Html.map (RoutedEditMsg receipeEditorModel)
-                        (ReceipeEditor.view receipeEditorModel)
+                    ReceipeEditor receipeEditorModel ->
+                        Html.Styled.map (RoutedEditMsg receipeEditorModel)
+                            (ReceipeEditor.view receipeEditorModel)
 
-                ViewReceipeList receipeList searchQuery ->
-                    viewReceipeOverview searchQuery receipeList
+                    ViewReceipeList receipeList searchQuery ->
+                        viewReceipeOverview searchQuery receipeList
 
-                CategoryView receipeList tag ->
-                    viewCategory receipeList tag
+                    CategoryView receipeList tag ->
+                        viewCategory receipeList tag
+                ]
             ]
-        ]
+        )
 
 
 viewReceipeOverview : String -> List ReceipePreview -> Html Msg
@@ -275,17 +280,45 @@ viewReceipes searchQuery receipeList =
     ul []
         (List.map
             (\receipe ->
-                li []
-                    (a [ href ("/receipe/" ++ String.fromInt receipe.id) ]
-                        (highlightSearchResult searchQuery (getTitle receipe))
-                        :: br [] []
-                        :: List.map
-                            (\t ->
-                                a [ href (Url.Builder.absolute [ "category", Url.percentEncode t ] []) ]
-                                    (highlightSearchResult searchQuery t)
-                            )
-                            receipe.tags
-                    )
+                let
+                    receipeLink =
+                        href ("/receipe/" ++ String.fromInt receipe.id)
+                in
+                li
+                    [ css [ displayFlex ]
+                    ]
+                    [ a [ receipeLink ]
+                        [ img
+                            [ src
+                                (Url.Builder.absolute [ "receipe", "image" ]
+                                    [ Url.Builder.int "receipe_id" receipe.id
+                                    , Url.Builder.int "image_id" (List.head receipe.image_ids |> Maybe.withDefault 0)
+                                    ]
+                                )
+                            , css
+                                [ Css.width (ex 12)
+                                ]
+                            ]
+                            []
+                        ]
+                    , div [ css [ margin2 (pt 0) (pt 10)] ]
+                        (div
+                            [ css
+                                [ fontFamilies [ "Helvetica", "Arial" ] 
+                                , margin (pt 2)
+                                , fontSize (pt 16)
+                                ]
+                            ]
+                            [ a [ receipeLink, css [textDecoration none, color (hex "000000")] ] (highlightSearchResult searchQuery (getTitle receipe)) ]
+                            :: List.map
+                                (\t ->
+                                    tagButton
+                                        [ href (Url.Builder.absolute [ "category", Url.percentEncode t ] []) ]
+                                        (highlightSearchResult searchQuery t)
+                                )
+                                receipe.tags
+                        )
+                    ]
             )
             receipeList
         )
@@ -351,7 +384,7 @@ viewNavBar receipeList =
         tags =
             List.concatMap .tags receipeList |> Set.fromList |> Set.toList
     in
-    nav [] (a [ href "/" ] [ text "Alle Rezepte" ] :: List.map (\t -> a [ href ("/category/" ++ t) ] [ text t ]) tags)
+    nav [] (tagButton [ href "/" ] [ text "Alle Rezepte" ] :: List.map (\t -> tagButton [ href ("/category/" ++ t) ] [ text t ]) tags)
 
 
 

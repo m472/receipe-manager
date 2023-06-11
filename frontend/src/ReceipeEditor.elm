@@ -3,9 +3,10 @@ module ReceipeEditor exposing (..)
 import Dict exposing (Dict)
 import File exposing (File)
 import Helpers exposing (lift)
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (..)
+import Html
+import Html.Styled exposing (..)
+import Html.Styled.Attributes exposing (..)
+import Html.Styled.Events exposing (..)
 import Http
 import Json.Decode as JD
 import Platform.Cmd as Cmd
@@ -120,7 +121,7 @@ view model =
             ]
             []
         , div [] (splitTags model.receipe.tags |> List.map (\s -> " " ++ s ++ " " |> text))
-        , Html.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe.id model.receipe.image_ids model.currentImage)
+        , Html.Styled.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , input [ on "change" (JD.map GotImages filesDecoder), type_ "file", multiple True ]
             [ text "Bild auswählen" ]
         , button [ onClick DeleteImage ] [ text "Bild löschen" ]
@@ -159,7 +160,7 @@ viewIngredientGroup : EditableReceipe -> Int -> EditableIngredientGroup -> Html 
 viewIngredientGroup receipe i ingredientGroup =
     let
         mapMessages =
-            Html.map (RoutedIngredientGroupMsg i)
+            Html.Styled.map (RoutedIngredientGroupMsg i)
     in
     div []
         [ mapMessages
@@ -181,7 +182,7 @@ viewIngredientGroup receipe i ingredientGroup =
 viewIngredient : Dict String Receipe.Unit -> Int -> Int -> EditableIngredient -> Html Msg
 viewIngredient units i j ingredient =
     li []
-        (List.map (Html.map (\msg -> RoutedIngredientGroupMsg i (RoutedIngredientMsg j msg)))
+        (List.map (Html.Styled.map (\msg -> RoutedIngredientGroupMsg i (RoutedIngredientMsg j msg)))
             [ viewEditMaybeFloat UpdateAmount ingredient.amount
             , viewUnit ingredient.unit units
             , text " "
@@ -198,7 +199,7 @@ viewIngredient units i j ingredient =
                 ]
                 []
             ]
-            ++ [ Html.map (RoutedIngredientGroupMsg i)
+            ++ [ Html.Styled.map (RoutedIngredientGroupMsg i)
                     (button [ onClick (RemoveIngredient j) ] [ text "-" ])
                ]
         )
@@ -273,7 +274,7 @@ viewInstructionGroup i instructionGroup =
     div []
         (b []
             [ text "Zubereitungsschritte für "
-            , Html.map (RoutedInstructionMsg i)
+            , Html.Styled.map (RoutedInstructionMsg i)
                 (input
                     [ type_ "text"
                     , onInput UpdateInstructionGroupName
@@ -284,9 +285,9 @@ viewInstructionGroup i instructionGroup =
             , text ":"
             ]
             :: List.indexedMap
-                (\j s -> Html.map (RoutedInstructionMsg i) (viewInstructionStep j s))
+                (\j s -> Html.Styled.map (RoutedInstructionMsg i) (viewInstructionStep j s))
                 instructionGroup.steps
-            ++ [ Html.map (RoutedInstructionMsg i) (button [ onClick AddStep ] [ text "Schritt hinzufügen" ])
+            ++ [ Html.Styled.map (RoutedInstructionMsg i) (button [ onClick AddStep ] [ text "Schritt hinzufügen" ])
                , button [ onClick (RemoveInstructionGroup i) ]
                     [ text "Zubereitungsgruppe entfernen" ]
                ]

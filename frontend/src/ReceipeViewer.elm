@@ -2,13 +2,15 @@ module ReceipeViewer exposing (..)
 
 import Dict exposing (Dict)
 import Helpers
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (..)
+import Html.Styled exposing (..)
+import Html.Styled.Attributes exposing (..)
+import Html.Styled.Events exposing (..)
 import Http
 import Receipe exposing (..)
 import ReceipeImageViewer exposing (viewImages)
 import Route
+import StyledElements
+import StyledElements exposing (tagButton)
 
 
 
@@ -56,8 +58,8 @@ view model =
     div []
         [ a [ href "/" ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
-        , div [] (List.map (\s -> " " ++ s ++ " " |> text) receipe.tags)
-        , Html.map ImageViewerMsg (viewImages model.receipe.id model.receipe.image_ids model.currentImage)
+        , div [] (List.map (\t -> tagButton [] [text t]) receipe.tags)
+        , Html.Styled.map ImageViewerMsg (viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , h2 [] [ text "Zutaten" ]
         , p []
             [ b []
