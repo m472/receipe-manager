@@ -2,11 +2,12 @@ module ReceipeImageViewer exposing (..)
 
 import Api
 import Array
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (..)
-import Receipe exposing (Receipe)
+import Html.Styled exposing (..)
+import Html.Styled.Attributes exposing (..)
+import Html.Styled.Events exposing (..)
+import Receipe exposing (ReceipeID)
 import Url.Builder
+import Css exposing (..)
 
 
 type Msg
@@ -18,15 +19,15 @@ type Msg
 -- VIEW
 
 
-viewImages : Receipe -> Int -> Html Msg
-viewImages receipe currentImage =
-    case Array.get currentImage (Array.fromList receipe.image_ids) of
+viewImages : ReceipeID -> List Int -> Int -> Html Msg
+viewImages receipeId imageIds currentImage =
+    case Array.get currentImage (Array.fromList imageIds) of
         Just value ->
-            div []
+            div [css [displayFlex, margin2 (pt 20) (pt 0)] ]
                 [ button [ onClick PrevImage ] [ text "<" ]
                 , img
-                    [ src (Api.ReceipeImage receipe currentImage |> Api.toString)
-                    , width 500
+                    [ src (Api.ReceipeImage receipeId currentImage |> Api.toString)
+                    , Html.Styled.Attributes.width 500
                     ]
                     []
                 , button [ onClick NextImage ] [ text ">" ]
@@ -40,11 +41,11 @@ viewImages receipe currentImage =
 -- UPDATE
 
 
-update : Msg -> Receipe -> Int -> Int
-update msg receipe currentImage =
+update : Msg -> List Int -> Int -> Int
+update msg image_ids currentImage =
     let
         imgCount =
-            List.length receipe.image_ids
+            List.length image_ids
     in
     case msg of
         NextImage ->

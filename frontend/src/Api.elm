@@ -1,13 +1,13 @@
 module Api exposing (..)
 
-import Receipe exposing (Receipe)
 import Url.Builder as UB
+import Receipe exposing (ReceipeID)
 
 
 type Endpoint
     = ReceipeList
     | Receipe Int
-    | ReceipeImage Receipe Int
+    | ReceipeImage ReceipeID Int
     | ImportReceipe String
 
 
@@ -20,8 +20,8 @@ toString endpoint =
         Receipe id ->
             UB.absolute [ "receipe" ] [ UB.int "id" id ]
 
-        ReceipeImage receipe image_id ->
-            UB.absolute [ "receipe", "image" ] [ UB.int "receipe_id" receipe.id, UB.int "image_id" image_id ]
+        ReceipeImage receipe_id image_id ->
+            UB.absolute [ "receipe", "image" ] [ UB.int "receipe_id" receipe_id, UB.int "image_id" image_id ]
 
         ImportReceipe url ->
             UB.absolute [ "receipe", "import" ] [ UB.string "url" url ]

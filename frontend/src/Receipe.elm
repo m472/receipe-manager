@@ -1,4 +1,4 @@
-module Receipe exposing (Ingredient, IngredientGroup, InstructionGroup, Receipe, Unit, decoder, encoder)
+module Receipe exposing (Ingredient, IngredientGroup, InstructionGroup, Receipe, Unit, Servings, decoder, encoder, ReceipeID)
 
 import Dict exposing (Dict)
 import Html exposing (..)
@@ -9,13 +9,14 @@ import Json.Encode as JE
 
 
 type alias Receipe =
-    { id : Int
+    { id : ReceipeID
     , title : String
     , image_ids : List Int
     , servings : Servings
     , ingredients : List IngredientGroup
     , instructions : List InstructionGroup
     , units : Dict String Unit
+    , tags: List String
     }
 
 
@@ -52,6 +53,8 @@ type alias InstructionGroup =
     }
 
 
+type alias ReceipeID = Int
+
 
 -- ENCODERS
 
@@ -65,6 +68,7 @@ encoder receipe =
         , ( "image_ids", JE.list JE.int receipe.image_ids )
         , ( "instructions", JE.list instructionGroupEncoder receipe.instructions )
         , ( "servings", servingsEncoder receipe.servings )
+        , ( "tags", JE.list JE.string receipe.tags )
         ]
 
 
@@ -118,7 +122,7 @@ maybeEncoder f value =
 
 decoder : JD.Decoder Receipe
 decoder =
-    JD.map7 Receipe
+    JD.map8 Receipe
         (JD.field "id" JD.int)
         (JD.field "title" JD.string)
         (JD.field "image_ids" (JD.list JD.int))
@@ -126,6 +130,7 @@ decoder =
         (JD.field "ingredients" (JD.list ingredientGroupDecoder))
         (JD.field "instructions" (JD.list instructionGroupDecoder))
         (JD.field "units" (JD.dict unitDecoder))
+        (JD.field "tags" (JD.list JD.string))
 
 
 servingsDecoder : JD.Decoder Servings

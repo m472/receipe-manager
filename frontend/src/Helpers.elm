@@ -29,3 +29,29 @@ viewMaybeFloat factor value =
 
         Nothing ->
             ""
+
+is_nothing : Maybe a -> Bool
+is_nothing value =
+    case value of
+        Nothing -> True
+        Just _ -> False
+
+keep_just : List (Maybe a) -> List a
+keep_just values =
+    case values of
+        [] -> []
+        (x::xs) -> case x of
+            Nothing -> keep_just xs
+            Just val -> val::keep_just xs
+
+lift : List (Maybe a) -> Maybe (List a)
+lift values =
+    case values of
+        [] -> Just []
+        (x::xs) -> 
+            case (x, lift xs) of
+                (Nothing, _) -> Nothing
+                (_, Nothing) -> Nothing
+                (Just xVal, Just xsVal) ->
+                    Just (xVal::xsVal)
+    

@@ -14,6 +14,7 @@ type Route
     | ViewReceipe Int
     | EditReceipe Int
     | ImportReceipe
+    | ViewCategory String
 
 
 parse : UP.Parser (Route -> a) a
@@ -24,9 +25,8 @@ parse =
             (UP.s "receipe" </> UP.s "edit" </> UP.int)
         , UP.map ImportReceipe (UP.s "receipe" </> UP.s "import")
         , UP.map Overview UP.top
+        , UP.map ViewCategory (UP.s "category" </> UP.string)
         ]
-
-
 
 -- URL BUILDING
 
@@ -50,3 +50,6 @@ toString route =
 
         ImportReceipe ->
             UB.absolute [ "receipe", "import" ] []
+
+        ViewCategory tag ->
+            UB.absolute ["category", tag] []
