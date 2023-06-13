@@ -1,8 +1,8 @@
 module Api exposing (..)
 
+import Http
 import Receipe exposing (ReceipeID)
 import Url.Builder as UB
-import Http
 
 
 type Endpoint
@@ -36,6 +36,7 @@ toString endpoint =
             UB.absolute [ "receipe", "create" ] []
 
 
+
 -- HTTP
 
 
@@ -48,14 +49,15 @@ deleteReceipe msg id =
         }
 
 
-get : { endpoint: Endpoint, expect: Http.Expect msg } -> Cmd msg
+get : { endpoint : Endpoint, expect : Http.Expect msg } -> Cmd msg
 get arg =
     Http.get
         { url = arg.endpoint |> toString
         , expect = arg.expect
         }
 
-post : { endpoint: Endpoint, expect: Http.Expect msg, body: Http.Body } -> Cmd msg
+
+post : { endpoint : Endpoint, expect : Http.Expect msg, body : Http.Body } -> Cmd msg
 post arg =
     Http.post
         { url = arg.endpoint |> toString

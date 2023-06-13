@@ -1,11 +1,9 @@
 module Route exposing (..)
 
 import Browser.Navigation as Nav
-import Url.Parser exposing ((</>), (<?>))
-import Url.Builder
-import Url.Parser.Query
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>), (<?>))
+import Url.Parser.Query
 
 
 
@@ -29,6 +27,8 @@ parse =
         , UP.map Overview (UP.top <?> Url.Parser.Query.string "tag")
         ]
 
+
+
 -- URL BUILDING
 
 
@@ -42,13 +42,13 @@ toString route =
     case route of
         Overview maybeTag ->
             UB.absolute []
-            (
-            case maybeTag of
-                Just tag ->
-                    [ Url.Builder.string "tag" tag]
-                Nothing ->
-                    []
-                    )
+                (case maybeTag of
+                    Just tag ->
+                        [ Url.Builder.string "tag" tag ]
+
+                    Nothing ->
+                        []
+                )
 
         ViewReceipe id ->
             UB.absolute [ "receipe", String.fromInt id ] []
@@ -58,4 +58,3 @@ toString route =
 
         ImportReceipe ->
             UB.absolute [ "receipe", "import" ] []
-

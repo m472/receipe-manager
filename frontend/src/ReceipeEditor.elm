@@ -12,8 +12,8 @@ import Platform.Cmd as Cmd
 import Receipe exposing (InstructionGroup)
 import ReceipeImageViewer
 import Route
-import Url.Builder
 import StyledElements exposing (tagButton)
+import Url.Builder
 
 
 
@@ -120,7 +120,7 @@ view model =
             , onInput UpdateTags
             ]
             []
-        , div [] (splitTags model.receipe.tags |> List.map (\t -> tagButton [href "#"] [text t]))
+        , div [] (splitTags model.receipe.tags |> List.map (\t -> tagButton [ href "#" ] [ text t ]))
         , Html.Styled.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , input [ on "change" (JD.map GotImages filesDecoder), type_ "file", multiple True ]
             [ text "Bild auswählen" ]

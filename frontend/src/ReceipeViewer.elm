@@ -1,5 +1,6 @@
 module ReceipeViewer exposing (..)
 
+import Api
 import Dict exposing (Dict)
 import Helpers
 import Html.Styled exposing (..)
@@ -10,7 +11,6 @@ import Receipe exposing (..)
 import ReceipeImageViewer exposing (viewImages)
 import Route
 import StyledElements exposing (..)
-import Api
 
 
 
@@ -58,7 +58,7 @@ view model =
     div []
         [ a [ href (Route.Overview Nothing |> Route.toString) ] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
-        , div [] (List.map (\t -> tagButton [] [text t]) receipe.tags)
+        , div [] (List.map (\t -> tagButton [] [ text t ]) receipe.tags)
         , Html.Styled.map ImageViewerMsg (viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , h2 [] [ text "Zutaten" ]
         , p []
@@ -143,10 +143,10 @@ update msg model =
         Deleted result ->
             case result of
                 Ok _ ->
-                    ( model, Route.load (Route.Overview Nothing))
+                    ( model, Route.load (Route.Overview Nothing) )
 
                 Err _ ->
-                    ( model, Route.load (Route.Overview Nothing))
+                    ( model, Route.load (Route.Overview Nothing) )
 
         ImageViewerMsg childMsg ->
             ( { model
@@ -157,6 +157,3 @@ update msg model =
               }
             , Cmd.none
             )
-
-
-

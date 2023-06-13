@@ -1,4 +1,4 @@
-module Receipe exposing (Ingredient, IngredientGroup, InstructionGroup, Receipe, Unit, Servings, decoder, encoder, ReceipeID)
+module Receipe exposing (Ingredient, IngredientGroup, InstructionGroup, Receipe, ReceipeID, Servings, Unit, decoder, encoder)
 
 import Dict exposing (Dict)
 import Html exposing (..)
@@ -16,7 +16,7 @@ type alias Receipe =
     , ingredients : List IngredientGroup
     , instructions : List InstructionGroup
     , units : Dict String Unit
-    , tags: List String
+    , tags : List String
     }
 
 
@@ -53,7 +53,9 @@ type alias InstructionGroup =
     }
 
 
-type alias ReceipeID = Int
+type alias ReceipeID =
+    Int
+
 
 
 -- ENCODERS
@@ -69,7 +71,7 @@ encoder receipe =
         , ( "instructions", JE.list instructionGroupEncoder receipe.instructions )
         , ( "servings", servingsEncoder receipe.servings )
         , ( "tags", JE.list JE.string receipe.tags )
-        , ( "units", JE.dict identity unitEncoder receipe.units)
+        , ( "units", JE.dict identity unitEncoder receipe.units )
         ]
 
 
@@ -120,10 +122,11 @@ maybeEncoder f value =
 unitEncoder : Unit -> JE.Value
 unitEncoder unit =
     JE.object
-        [("id", JE.string unit.id)
-        ,("symbol", JE.string unit.symbol)
-        ,("si_conversion_factor", JE.float unit.si_conversion_factor)
+        [ ( "id", JE.string unit.id )
+        , ( "symbol", JE.string unit.symbol )
+        , ( "si_conversion_factor", JE.float unit.si_conversion_factor )
         ]
+
 
 
 -- DECODERS

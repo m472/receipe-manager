@@ -10,19 +10,17 @@ import Html.Styled.Events exposing (..)
 import Http
 import Importer
 import Json.Decode as JD
-import Platform.Cmd as Cmd
-import Json.Decode as JD exposing (Error(..))
 import List
+import Platform.Cmd as Cmd
 import Receipe
 import ReceipeEditor
 import ReceipeViewer
 import Route exposing (Route(..))
-import Url
 import Set
 import StyledElements exposing (..)
 import Url
 import Url.Builder
-import Url.Parser exposing ((</>), (<?>))
+import Url.Parser
 
 
 
@@ -129,8 +127,11 @@ update msg model =
                     )
 
                 Err _ ->
-                    ( { model 
-                    | content = Failure "Rezept zum Editieren laden fehlgeschlagen" }, Cmd.none )
+                    ( { model
+                        | content = Failure "Rezept zum Editieren laden fehlgeschlagen"
+                      }
+                    , Cmd.none
+                    )
 
         GotNewReceipe result ->
             case result of
@@ -204,7 +205,7 @@ update msg model =
             ( { model | content = Loading "neues Rezept" }, getNewReceipe )
 
         OpenReceipeImporter ->
-            ( { model | content = Loading "Rezept Importer" }, Route.load Route.ImportReceipe)
+            ( { model | content = Loading "Rezept Importer" }, Route.load Route.ImportReceipe )
 
 
 onUrlChange : Url.Url -> ( ModelContent, Cmd Msg )
@@ -244,28 +245,28 @@ view model =
     Browser.Document
         "Receipe Manager"
         (List.map toUnstyled
-        [ main_ []
-            [ case model.content of
-                Failure errorMsg ->
-                    text ("Fehler: " ++ errorMsg)
+            [ main_ []
+                [ case model.content of
+                    Failure errorMsg ->
+                        text ("Fehler: " ++ errorMsg)
 
-                Loading msg ->
-                    text ("loading " ++ msg ++ " ...")
+                    Loading msg ->
+                        text ("loading " ++ msg ++ " ...")
 
-                ReceipeViewer receipeViewerModel ->
-                    Html.Styled.map (RoutedReceipeMsg receipeViewerModel)
-                        (ReceipeViewer.view receipeViewerModel)
+                    ReceipeViewer receipeViewerModel ->
+                        Html.Styled.map (RoutedReceipeMsg receipeViewerModel)
+                            (ReceipeViewer.view receipeViewerModel)
 
-                ReceipeEditor receipeEditorModel ->
-                    Html.Styled.map (RoutedEditMsg receipeEditorModel)
-                        (ReceipeEditor.view receipeEditorModel)
+                    ReceipeEditor receipeEditorModel ->
+                        Html.Styled.map (RoutedEditMsg receipeEditorModel)
+                            (ReceipeEditor.view receipeEditorModel)
 
-                ViewReceipeList tag receipeList searchQuery ->
-                    viewReceipeOverview tag searchQuery receipeList
+                    ViewReceipeList tag receipeList searchQuery ->
+                        viewReceipeOverview tag searchQuery receipeList
 
-                ReceipeImporter importerModel ->
-                    Html.Styled.map (RoutedImportMsg importerModel)
-                        (Importer.view importerModel)
+                    ReceipeImporter importerModel ->
+                        Html.Styled.map (RoutedImportMsg importerModel)
+                            (Importer.view importerModel)
                 ]
             ]
         )
