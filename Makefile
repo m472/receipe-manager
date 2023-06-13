@@ -8,3 +8,6 @@ dev-build-frontend:
 
 run-dev: dev-build-frontend
 	python main.py
+
+test-elm:
+	cd frontend; npx elm-test
