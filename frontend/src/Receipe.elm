@@ -69,6 +69,7 @@ encoder receipe =
         , ( "instructions", JE.list instructionGroupEncoder receipe.instructions )
         , ( "servings", servingsEncoder receipe.servings )
         , ( "tags", JE.list JE.string receipe.tags )
+        , ( "units", JE.dict identity unitEncoder receipe.units)
         ]
 
 
@@ -115,6 +116,14 @@ maybeEncoder f value =
         Nothing ->
             JE.null
 
+
+unitEncoder : Unit -> JE.Value
+unitEncoder unit =
+    JE.object
+        [("id", JE.string unit.id)
+        ,("symbol", JE.string unit.symbol)
+        ,("si_conversion_factor", JE.float unit.si_conversion_factor)
+        ]
 
 
 -- DECODERS
