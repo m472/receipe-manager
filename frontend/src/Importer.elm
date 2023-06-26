@@ -6,6 +6,7 @@ import Html.Styled.Attributes exposing (..)
 import Html.Styled.Events exposing (..)
 import Http
 import Receipe
+import Route exposing (Route)
 
 
 
@@ -51,6 +52,9 @@ update msg model =
         ( EnterUrl url, Import ) ->
             ( Loading, getImportReceipe url )
 
+        ( Loading, ImportResult (Ok receipe) ) ->
+            ( model, Route.load (Route.EditReceipe receipe.id))
+
         -- ignore messages from non-matching states
         ( _, _ ) ->
             ( model, Cmd.none )
@@ -62,7 +66,8 @@ update msg model =
 
 getImportReceipe : String -> Cmd Msg
 getImportReceipe url =
-    Api.get
+    Api.post
         { endpoint = Api.ImportReceipe url
         , expect = Http.expectJson ImportResult Receipe.decoder
+        , body = Http.emptyBody
         }

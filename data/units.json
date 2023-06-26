@@ -25,12 +25,12 @@
         "si_conversion_factor": 1e-4
     },
     {
-        "id": "tsp",
+        "id": "tl",
         "symbol": "TL",
         "si_conversion_factor": 5e-6
     },
     {
-        "id": "tbsp",
+        "id": "el",
         "symbol": "EL",
         "si_conversion_factor": 1.5e-5
     },

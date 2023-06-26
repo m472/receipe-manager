@@ -44,7 +44,7 @@ toString route =
             UB.absolute []
                 (case maybeTag of
                     Just tag ->
-                        [ Url.Builder.string "tag" tag ]
+                        [ UB.string "tag" tag ]
 
                     Nothing ->
                         []

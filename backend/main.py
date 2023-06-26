@@ -1,118 +1,30 @@
 from __future__ import annotations
 
-import json
 import re
-from copy import deepcopy
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
-from typing import TYPE_CHECKING, Type, TypeVar
+from dataclasses import asdict
+from typing import TYPE_CHECKING
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
-from serde import SerdeError, from_dict
-from serde.json import from_json, to_json
+import requests
+from flask import (
+    Flask,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    url_for,
+)
+from serde import SerdeError
+from serde.json import from_json
+
+from backend.datamodel import COOKBOOK, RECEIPE_DIR, RECEIPE_IMG_DIR, Receipe, Servings
+from backend.importer.bianca_zapatka import BiancaZapatkaImporter
 
 if TYPE_CHECKING:
     from werkzeug.wrappers.response import Response
 
-_T = TypeVar("_T")
 
 app = Flask(__name__)
-
-DATA_DIR = Path("data")
-RECEIPE_DIR = DATA_DIR / "receipes"
-RECEIPE_IMG_DIR = RECEIPE_DIR / "images"
-UNITS_FILE = DATA_DIR / "units.json"
-
-
-@dataclass
-class Unit:
-    id: str
-    symbol: str
-    si_conversion_factor: float
-
-
-@dataclass
-class Ingredient:
-    amount: float | int | None
-    unit: str
-    name: str
-    comment: str | None
-
-
-@dataclass
-class IngredientGroup:
-    name: str
-    ingredients: list[Ingredient]
-
-
-@dataclass
-class InstructionGroup:
-    name: str
-    steps: list[str]
-
-
-@dataclass
-class Servings:
-    amount: int
-    unit: str
-
-
-@dataclass
-class Receipe:
-    id: int
-    title: str
-    ingredients: list[IngredientGroup]
-    instructions: list[InstructionGroup]
-    servings: Servings
-    image_ids: list[int] = field(default_factory=list)
-    tags: list[str] = field(default_factory=list)
-
-    def get_image_ids(self) -> list[int]:
-        return [
-            int(f.name.split("_")[1].split(".")[0])
-            for f in RECEIPE_IMG_DIR.glob(f"{self.id}_*.jpg")
-        ]
-
-    def multiply_by(self, factor: int | float) -> Receipe:
-        res = deepcopy(self)
-
-        for ig in res.ingredients:
-            for i in ig.ingredients:
-                if isinstance(i.amount, (int, float)):
-                    i.amount *= factor
-
-        return res
-
-    @classmethod
-    def load(cls: Type[_T], path: Path) -> _T:
-        return from_json(cls, path.read_text())
-
-    def save(self) -> None:
-        COOKBOOK.receipes[self.id] = self
-        (RECEIPE_DIR / f"{self.id}.json").write_text(to_json(self))
-
-
-@dataclass
-class Cookbook:
-    receipes: dict[int, Receipe]
-    units: dict[str, Unit]
-
-    @staticmethod
-    def load() -> Cookbook:
-        receipes = [
-            Receipe.load(f)
-            for f in RECEIPE_DIR.iterdir()
-            if f.is_file() and f.name.endswith(".json")
-        ]
-        units = [from_dict(Unit, f) for f in json.loads(UNITS_FILE.read_text())]
-
-        return Cookbook(
-            receipes={r.id: r for r in receipes},
-            units={u.id: u for u in units},
-        )
-
-
-COOKBOOK = Cookbook.load()
 
 
 @app.route("/")
@@ -148,9 +60,9 @@ def json_receipe() -> Response:
 @app.route("/receipe/update", methods=["POST"])
 def json_receipe_update() -> tuple[Response, int]:
     try:
-        id = int(request.args["id"])
-        receipe = from_json(Receipe, request.data)
-        assert receipe.id == id
+        _id = int(request.args["id"])
+        receipe = from_json(Receipe, request.data.decode("utf-8"))
+        assert receipe.id == _id
 
         # delete unreferenced images
         for img_path in RECEIPE_IMG_DIR.iterdir():
@@ -177,6 +89,46 @@ def json_receipe_update() -> tuple[Response, int]:
         status = "success"
 
     return (jsonify({"status": status}), status_code)
+
+
+@app.route("/receipe/import", methods=["POST"])
+def import_receipe() -> tuple[Response, int] | Response:
+
+    url = request.args["url"]
+    _id = max(COOKBOOK.receipes) + 1
+
+    m = re.match(r"(https?://)?(www.)?([a-z0-9\.\-]+)(/.*)?", url)
+    if m:
+        print(m.group(3))
+
+    match m.group(3) if m else None:
+
+        case "biancazapatka.com":
+            importer = BiancaZapatkaImporter()
+
+        case None:
+            msg = f"could not parse url '{url}'"
+            print(msg)
+            return (jsonify({"status", msg}), 400)
+
+        case domain:
+            msg = f"no import handler for domain '{domain}'"
+            print(msg)
+            return (
+                jsonify({"status", msg}),
+                400,
+            )
+
+    response = requests.get(url)
+    assert response.ok
+
+    receipe = importer.parse_receipe(response.text)
+
+    # save imported receipe
+    receipe.id = _id
+    receipe.save()
+
+    return redirect(url_for(json_receipe.__name__, id=receipe.id))
 
 
 @app.route("/receipe/create", methods=["POST"])

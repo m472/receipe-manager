@@ -1,15 +1,16 @@
 import re
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 
-from backend.importer.agnostic import UNITS, Importer
-from backend.main import (
+from backend.datamodel import (
     Ingredient,
     IngredientGroup,
     InstructionGroup,
     Receipe,
     Servings,
 )
+from backend.importer.agnostic import UNITS, Importer
 
 
 class BiancaZapatkaImporter(Importer):
@@ -22,7 +23,7 @@ class BiancaZapatkaImporter(Importer):
             return None
 
     @staticmethod
-    def _parse_ingredient(tag) -> Ingredient:
+    def _parse_ingredient(tag: Tag) -> Ingredient:
 
         notes_tag = tag.find("span", class_="wprm-receipe-ingredient-notes")
         unit_tag = tag.find("span", class_="wprm-recipe-ingredient-unit")
