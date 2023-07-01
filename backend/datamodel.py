@@ -12,7 +12,7 @@ from serde.json import from_json, to_json
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-DATA_DIR = Path("data")
+DATA_DIR = Path(__file__).parent.parent / "data"
 RECEIPE_DIR = DATA_DIR / "receipes"
 RECEIPE_IMG_DIR = RECEIPE_DIR / "images"
 UNITS_FILE = DATA_DIR / "units.json"
@@ -81,7 +81,6 @@ class Receipe:
     @classmethod
     def load(cls, path: Path) -> Self:
         text = path.read_text()
-        print(cls)
         return from_json(cls, text)
 
     def save(self) -> None:
