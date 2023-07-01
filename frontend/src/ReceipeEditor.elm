@@ -3,16 +3,15 @@ module ReceipeEditor exposing (..)
 import Dict exposing (Dict)
 import File exposing (File)
 import Helpers exposing (lift)
-import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (..)
-import Html.Styled.Events exposing (..)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Http
 import Json.Decode as JD
 import Platform.Cmd as Cmd
 import Receipe exposing (InstructionGroup)
 import ReceipeImageViewer
 import Route
-import StyledElements exposing (tagButton)
 import Url.Builder
 
 
@@ -118,16 +117,17 @@ view model =
             [ type_ "text"
             , value model.receipe.tags
             , onInput UpdateTags
+            , class "tag-input"
             ]
             []
-        , div [] (splitTags model.receipe.tags |> List.map (\t -> tagButton [ href "#" ] [ text t ]))
-        , Html.Styled.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe.id model.receipe.image_ids model.currentImage)
+        , div [] (splitTags model.receipe.tags |> List.map (\t -> a [ href "#", class "tag-button", class "rounded-button" ] [ text t ]))
+        , Html.map ImageViewerMsg (ReceipeImageViewer.viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , input [ on "change" (JD.map GotImages filesDecoder), type_ "file", multiple True ]
             [ text "Bild auswählen" ]
-        , button [ onClick DeleteImage ] [ text "Bild löschen" ]
+        , button [ onClick DeleteImage, class "rounded-button", class "red-button" ] [ text "Bild löschen" ]
         , h2 [] [ text "Zutaten" ]
         , p []
-            [ b []
+            [ h3 []
                 [ text "Zutaten für "
                 , viewEditInt UpdateServingsAmount model.receipe.servings.amount
                 , text " "
@@ -140,7 +140,7 @@ view model =
                 ]
             ]
         , div [] (List.indexedMap (viewIngredientGroup model.receipe) model.receipe.ingredients)
-        , button [ onClick AddIngredientGroup ]
+        , button [ onClick AddIngredientGroup, class "rounded-button" ]
             [ text "Zutatengruppe hinzufügen" ]
         , h2 [] [ text "Zubereitung" ]
         , div []
@@ -151,8 +151,8 @@ view model =
         , br [] []
         , text model.errorMessage
         , br [] []
-        , button [ onClick Save ] [ text "Speichern" ]
-        , button [ onClick CancelEdit ] [ text "Abbrechen" ]
+        , button [ onClick Save, class "rounded-button" ] [ text "Speichern" ]
+        , button [ onClick CancelEdit, class "rounded-button", class "red-button" ] [ text "Abbrechen" ]
         ]
 
 
@@ -160,29 +160,31 @@ viewIngredientGroup : EditableReceipe -> Int -> EditableIngredientGroup -> Html 
 viewIngredientGroup receipe i ingredientGroup =
     let
         mapMessages =
-            Html.Styled.map (RoutedIngredientGroupMsg i)
+            Html.map (RoutedIngredientGroupMsg i)
     in
-    div []
-        [ mapMessages
-            (b []
-                [ text "Zutatengruppe: "
-                , input [ value ingredientGroup.name, onInput UpdateGroupName ] []
-                ]
-            )
-        , button [ onClick (RemoveIngredientGroup i) ] [ text "entfernen" ]
+    div [ class "ingredient-group" ]
+        [ div [ class "ingredient-group-title" ]
+            [ mapMessages
+                (h3 []
+                    [ text "Zutatengruppe: "
+                    , input [ value ingredientGroup.name, onInput UpdateGroupName ] []
+                    ]
+                )
+            , button [ onClick (RemoveIngredientGroup i), class "rounded-button", class "red-button" ] [ text "entfernen" ]
+            ]
         , ul []
             (List.indexedMap
                 (viewIngredient receipe.units i)
                 ingredientGroup.ingredients
             )
-        , mapMessages (button [ onClick AddIngredient ] [ text "Zutat hinzufügen" ])
+        , mapMessages (button [ onClick AddIngredient, class "rounded-button" ] [ text "Zutat hinzufügen" ])
         ]
 
 
 viewIngredient : Dict String Receipe.Unit -> Int -> Int -> EditableIngredient -> Html Msg
 viewIngredient units i j ingredient =
-    li []
-        (List.map (Html.Styled.map (\msg -> RoutedIngredientGroupMsg i (RoutedIngredientMsg j msg)))
+    li [ class "ingredient" ]
+        (List.map (Html.map (\msg -> RoutedIngredientGroupMsg i (RoutedIngredientMsg j msg)))
             [ viewEditMaybeFloat UpdateAmount ingredient.amount
             , viewUnit ingredient.unit units
             , text " "
@@ -199,8 +201,14 @@ viewIngredient units i j ingredient =
                 ]
                 []
             ]
-            ++ [ Html.Styled.map (RoutedIngredientGroupMsg i)
-                    (button [ onClick (RemoveIngredient j) ] [ text "-" ])
+            ++ [ Html.map (RoutedIngredientGroupMsg i)
+                    (button
+                        [ onClick (RemoveIngredient j)
+                        , class "rounded-button"
+                        , class "red-button"
+                        ]
+                        [ text "-" ]
+                    )
                ]
         )
 
@@ -232,22 +240,22 @@ viewEditMaybeFloat onInputMsg =
 viewEditNumber : (String -> b) -> (a -> String) -> Result (ParseError a) a -> Html b
 viewEditNumber onInputMsg fromNumber parseResult =
     let
-        ( val, msg ) =
+        ( val, msg, msgClass ) =
             case parseResult of
                 Ok parsed ->
-                    ( fromNumber parsed, text "" )
+                    ( fromNumber parsed, text "", "" )
 
                 Err errorInfo ->
-                    ( errorInfo.invalidValue, text errorInfo.message )
+                    ( errorInfo.invalidValue, text errorInfo.message, "input-error" )
     in
-    div []
+    div [ class "edit-number" ]
         [ input
             [ type_ "text"
             , value val
             , onInput onInputMsg
             ]
             []
-        , msg
+        , span [ class msgClass ] [ msg ]
         ]
 
 
@@ -272,9 +280,9 @@ viewUnit ingredient_unit_id units =
 viewInstructionGroup : Int -> InstructionGroup -> Html Msg
 viewInstructionGroup i instructionGroup =
     div []
-        (b []
+        (h3 []
             [ text "Zubereitungsschritte für "
-            , Html.Styled.map (RoutedInstructionMsg i)
+            , Html.map (RoutedInstructionMsg i)
                 (input
                     [ type_ "text"
                     , onInput UpdateInstructionGroupName
@@ -285,10 +293,10 @@ viewInstructionGroup i instructionGroup =
             , text ":"
             ]
             :: List.indexedMap
-                (\j s -> Html.Styled.map (RoutedInstructionMsg i) (viewInstructionStep j s))
+                (\j s -> Html.map (RoutedInstructionMsg i) (viewInstructionStep j s))
                 instructionGroup.steps
-            ++ [ Html.Styled.map (RoutedInstructionMsg i) (button [ onClick AddStep ] [ text "Schritt hinzufügen" ])
-               , button [ onClick (RemoveInstructionGroup i) ]
+            ++ [ Html.map (RoutedInstructionMsg i) (button [ onClick AddStep, class "rounded-button" ] [ text "Schritt hinzufügen" ])
+               , button [ onClick (RemoveInstructionGroup i), class "rounded-button", class "red-button" ]
                     [ text "Zubereitungsgruppe entfernen" ]
                ]
         )
@@ -296,10 +304,10 @@ viewInstructionGroup i instructionGroup =
 
 viewInstructionStep : Int -> String -> Html InstructionGroupMsg
 viewInstructionStep index step =
-    div []
-        [ text (String.fromInt (index + 1) ++ ". ")
+    div [ class "instruction-step" ]
+        [ div [] [ text (String.fromInt (index + 1) ++ ".") ]
         , textarea [ onInput (UpdateStep index) ] [ text step ]
-        , button [ onClick (RemoveStep index) ] [ text "-" ]
+        , button [ onClick (RemoveStep index), class "rounded-button", class "red-button" ] [ text "-" ]
         ]
 
 

@@ -2,12 +2,10 @@ module ReceipeImageViewer exposing (..)
 
 import Api
 import Array
-import Css exposing (..)
-import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (..)
-import Html.Styled.Events exposing (..)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Receipe exposing (ReceipeID)
-import Url.Builder
 
 
 type Msg
@@ -22,15 +20,16 @@ type Msg
 viewImages : ReceipeID -> List Int -> Int -> Html Msg
 viewImages receipeId imageIds currentImage =
     case Array.get currentImage (Array.fromList imageIds) of
-        Just value ->
-            div [ css [ displayFlex, margin2 (pt 20) (pt 0) ] ]
-                [ button [ onClick PrevImage ] [ text "<" ]
-                , img
-                    [ src (Api.ReceipeImage receipeId currentImage |> Api.toString)
-                    , Html.Styled.Attributes.width 500
-                    ]
+        Just _ ->
+            div [ class "img-viewer" ]
+                [ button
+                    [ onClick PrevImage ]
+                    [ text "<" ]
+                , img [ src (Api.ReceipeImage receipeId currentImage |> Api.toString) ]
                     []
-                , button [ onClick NextImage ] [ text ">" ]
+                , button
+                    [ onClick NextImage ]
+                    [ text ">" ]
                 ]
 
         Nothing ->

@@ -3,14 +3,13 @@ module ReceipeViewer exposing (..)
 import Api
 import Dict exposing (Dict)
 import Helpers
-import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (..)
-import Html.Styled.Events exposing (..)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Http
 import Receipe exposing (..)
 import ReceipeImageViewer exposing (viewImages)
 import Route
-import StyledElements exposing (..)
 
 
 
@@ -56,13 +55,24 @@ view model =
             toFloat model.servings / toFloat receipe.servings.amount
     in
     div []
-        [ a [ href (Route.Overview Nothing |> Route.toString) ] [ text "Alle Rezepte" ]
+        [ a [ href (Route.Overview Nothing |> Route.toString) , class "tag-button", class "rounded-button"] [ text "Alle Rezepte" ]
         , h1 [] [ text receipe.title ]
-        , div [] (List.map (\t -> tagButton [] [ text t ]) receipe.tags)
-        , Html.Styled.map ImageViewerMsg (viewImages model.receipe.id model.receipe.image_ids model.currentImage)
+        , div []
+            (List.map
+                (\t ->
+                    a
+                        [ href (Route.Overview (Just t) |> Route.toString)
+                        , class "tag-button"
+                        , class "rounded-button"
+                        ]
+                        [ text t ]
+                )
+                receipe.tags
+            )
+        , Html.map ImageViewerMsg (viewImages model.receipe.id model.receipe.image_ids model.currentImage)
         , h2 [] [ text "Zutaten" ]
         , p []
-            [ b []
+            [ h3 []
                 [ text "Zutaten für "
                 , input
                     [ type_ "number"
@@ -76,15 +86,15 @@ view model =
         , div [] (List.map (viewIngredientGroup scaling_factor receipe.units) receipe.ingredients)
         , h2 [] [ text "Zubereitung" ]
         , div [] (List.map viewInstructionGroup receipe.instructions)
-        , button [ onClick Edit ] [ text "bearbeiten" ]
-        , button [ onClick Delete ] [ text "löschen" ]
+        , button [ onClick Edit, class "rounded-button" ] [ text "bearbeiten" ]
+        , button [ onClick Delete, class "rounded-button", class "red-button" ] [ text "löschen" ]
         ]
 
 
 viewIngredientGroup : Float -> Dict String Unit -> IngredientGroup -> Html a
 viewIngredientGroup factor units ingredientGroup =
     div []
-        [ b [] [ text ingredientGroup.name ]
+        [ h3 [] [ text ingredientGroup.name ]
         , ul [] (List.map (viewIngredient factor units) ingredientGroup.ingredients)
         ]
 
@@ -114,7 +124,7 @@ viewUnit ingredient_unit_id units =
 viewInstructionGroup : InstructionGroup -> Html a
 viewInstructionGroup group =
     div []
-        [ b [] [ text group.name ]
+        [ h3 [] [ text group.name ]
         , ul [] (List.map (\step -> li [] [ text step ]) group.steps)
         ]
 
